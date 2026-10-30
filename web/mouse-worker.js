@@ -14,6 +14,11 @@ importScripts(ORT + "ort.webgpu.min.js");
 // In a worker there is no <script> tag for the runtime to find its .wasm
 // files beside, so it is told where they are.
 ort.env.wasm.wasmPaths = ORT;
+// The local page and Tauri webviews don't promise cross-origin isolation. Keep
+// ONNX Runtime on its portable single-threaded WASM path instead of letting a
+// speculative WebGPU session initialise a threaded fallback first.
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.proxy = false;
 
 let sess = null, meta = null, state = null, looks = 0, ep = "";
 
@@ -53,7 +58,7 @@ self.onmessage = async (e) => {
       meta = await (await fetch(new URL("mouse.json", new URL(msg.base, self.location.href)))).json();
       const buf = await loadModel(new URL(msg.base, self.location.href));
       const tried = [];
-      for (const want of ["webgpu", "wasm"]) {
+      for (const want of ["wasm", "webgpu"]) {
         try { sess = await ort.InferenceSession.create(buf, { executionProviders: [want] }); ep = want; break; }
         catch (err) { tried.push(`${want}: ${err && err.message || err}`); if (want === "wasm") throw new Error(tried.join("; ")); }
       }

@@ -1144,7 +1144,9 @@ function mouseLook() {
   for (let i = 0; i < f.length; i++) { const v = f[i] * 255, o = i * 4; image.data[o] = image.data[o + 1] = image.data[o + 2] = v; image.data[o + 3] = 255; }
   c.putImageData(image, 0, 0);
   m.busy = true; drawMouseMonitor(m); showBoard();
-  mouseWorker.call("look", { frame: f, frames: 15 }, [f.buffer]).then((r) => {
+  // One screen frame per game turn keeps the full recurrent visual model
+  // responsive on CPU-only machines; its hidden state carries between turns.
+  mouseWorker.call("look", { frame: f, frames: 1 }, [f.buffer]).then((r) => {
     m.busy = false; m.looks++; m.ms = r.ms; m.ep = r.ep;
     const a = m.st.brain.activity; let above = 0;
     for (let u = 0; u < r.response.length; u++) { const v = r.response[u]; if (v > 1) above++; a[u] = Math.max(a[u], Math.min(1, Math.max(0, (v - 0.8) * 0.9))); }
@@ -1560,7 +1562,7 @@ async function playForever() {
         try {
           if (s.species.id === "mouse_v1") {
             const frame = mouseFrameData();
-            const r = await s.brain.w.call("look", { frame, frames: 15 }, [frame.buffer]);
+            const r = await s.brain.w.call("look", { frame, frames: 1 }, [frame.buffer]);
             const counts = Uint16Array.from(r.response, (hz) => Math.min(65535, Math.max(0, Math.round(hz * (s.meta.window_ms || WINDOW_MS) / 1000))));
             s.state = "ready"; showBoard();
             return { s, p, bySignal, counts, ms: r.ms, tSeed };
