@@ -51,6 +51,7 @@
   .views button[aria-pressed="true"] { background: var(--amber); color: #1B1406; border-color: var(--amber); }
 
   .setup { position: fixed; left: 20px; top: 150px; width: 330px; max-height: calc(100vh - 250px); overflow-y: auto; border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
+  .setup { z-index: 6; }
   .setup[data-open="false"] > :not(h2) { display: none; }
   .setup h2, .rail h2 { margin: 0; font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
   .fold { all: unset; cursor: pointer; display: flex; flex: 1; justify-content: space-between; align-items: center; }
@@ -78,7 +79,7 @@
   .roster b { font-weight: 500; color: var(--paper); }
   .roster .why { font-size: 11px; text-align: right; }
 
-  .rail { position: fixed; top: 76px; right: 20px; width: 360px; max-height: calc(100vh - 176px); overflow-y: auto; border-radius: 14px; padding: 14px 14px 12px; display: grid; gap: 10px; align-content: start; }
+  .rail { position: fixed; top: 76px; right: 20px; width: 360px; max-height: calc(100vh - 176px); overflow-y: auto; border-radius: 14px; padding: 14px 14px 12px; display: grid; gap: 10px; align-content: start; z-index: 4; }
   .gamehead .label { font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
   .gamehead .turn { display: block; font: 800 26px/1.05 var(--display); text-transform: uppercase; margin-top: 4px; }
   .board { display: grid; gap: 8px; }
@@ -122,6 +123,8 @@
     .setup { top: 70px; left: 16px; right: 16px; width: auto; max-height: 50vh; }
     .rail { top: auto; bottom: 200px; left: 16px; right: 16px; width: auto; max-height: 28vh; }
     .statusbar { left: 16px; right: 16px; bottom: 16px; grid-template-columns: 1fr; }
+    .setup { max-height: calc(100vh - 220px); }
+    body.setup-open .rail, body.setup-open .views { display: none; }
   }
 </style>
 
@@ -1431,7 +1434,7 @@ $("startBtn").addEventListener("click", () => {
   wanted = { path: mapSelect.value, plan: plan.map((p) => ({ ...p })) }; restartNow = true;
 });
 const narrow = matchMedia("(max-width: 900px)");
-function setFold(open) { $("setup").dataset.open = open ? "true" : "false"; $("setupFold").setAttribute("aria-expanded", String(open)); $("setupFold").querySelector("i").textContent = open ? "−" : "+"; }
+function setFold(open) { $("setup").dataset.open = open ? "true" : "false"; document.body.classList.toggle("setup-open", open && narrow.matches); $("setupFold").setAttribute("aria-expanded", String(open)); $("setupFold").querySelector("i").textContent = open ? "−" : "+"; }
 setFold(!narrow.matches);
 $("setupFold").addEventListener("click", () => setFold($("setup").dataset.open !== "true"));
 
