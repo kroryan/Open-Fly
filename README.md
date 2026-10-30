@@ -7,15 +7,12 @@
 Open Fly combines Open Animal Stage's 3D room, animal models, animations and
 species catalogue with Open Doctrines' own game engine compiled to WebAssembly.
 Locally built desktop apps can include the available fly, larva, worm, sea
-squirt, zebrafish and mouse brain packages. The mouse is visual cortex, so its
-game actions use a labelled synthetic visual-to-action mapping, not biological
-motor output.
+squirt and zebrafish brain packages.
 
 Each turn:
 
 1. Each animal receives the shared country signals through the sensory mapping
-   in its brain package. The mouse instead sees a greyscale rendering of the
-   world and its predicted visual response drives the synthetic action mapping.
+   in its brain package.
 2. The brain runs for its package's simulation window.
 3. Activity in the package's action groups chooses the orders.
 

@@ -7,10 +7,6 @@ not depend on a network connection to Google Fonts, cdnjs, or jsDelivr.
 - `three.min.js` and `GLTFLoader.js`: Three.js r128, MIT. License in
   `licenses/THREE-MIT.txt`.
 - `fflate.js`: fflate 0.8.2, MIT. License in `licenses/FFLATE-MIT.txt`.
-- `onnxruntime-web/`: ONNX Runtime Web 1.30.0 ESM runtime and pinned default,
-  Asyncify, and JSPI WASM payloads, MIT. Desktop loads the ESM runtime and
-  explicitly selects the Asyncify backend for WebKit compatibility.
-  License in `licenses/ONNXRUNTIME-MIT.txt`.
 - `fonts/`: Big Shoulders Display, Figtree, and JetBrains Mono, SIL Open Font
   License 1.1. Licenses in `licenses/`.
 - The Animal Stage runtime and 3D models are from

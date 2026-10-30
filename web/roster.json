@@ -2,7 +2,7 @@
   "_comment": [
     "Central local resource catalogue for the web and desktop bundles.",
     "A package is available in a build only when its required files are present and verified.",
-    "The mouse uses a declared synthetic visual-to-action convention; MICrONS has no motor cortex."
+    "Species are listed only when the app has a supported runtime and an export path."
   ],
   "checked": "2026-09-21",
   "species": [
@@ -185,33 +185,6 @@
         "connectome": "species/zebrafish_larva/connectome.pack.json",
         "model": "models/zebrafish_larva.glb"
       }
-    },
-    {
-      "id": "mouse_v1",
-      "name": "Mouse",
-      "detail": "visual cortex",
-      "dataset": "MICrONS cubic millimetre",
-      "neurons": 120000,
-      "cells": 200000,
-      "synapses": 523000000,
-      "seat": true,
-      "station": true,
-      "model": null,
-      "status": "playable · synthetic readout",
-      "why_no_seat": null,
-      "functional": "~75,000 pyramidal neurons with recorded responses to visual stimuli",
-      "redistribute": false,
-      "redistribute_why": "MICrONS source data is CC BY 4.0, but the released digital-twin model weights state no licence; included only in the owner’s local build.",
-      "terms_url": "https://github.com/cajal/fnn",
-      "public_redistribute": false,
-      "public_why": "The downloaded MICrONS digital-twin model weights have no explicit redistribution licence.",
-      "resources": {
-        "metadata": "species/mouse_v1/mouse.json",
-        "model": "models/mouse_v1.glb",
-        "modelWeights": "species/mouse_v1/model.pack.json"
-      },
-      "note": "MICrONS is visual cortex only. The game maps visual-model activity to actions by a deterministic synthetic readout; this is not biological motor output.",
-      "local_only": true
     }
   ],
   "source": {

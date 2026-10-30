@@ -17,4 +17,4 @@ cd "$HERE"
 "$PYTHON" tools/fetch_stage_assets.py --python "$PYTHON"
 tools/build_web_agent.sh "$OD" "$REF"
 "$PYTHON" tools/pack_web.py --no-gzip web/agent/OpenDoctrinesAgent.data
-echo "All eight roster packages and the game runtime are ready for offline desktop builds."
+echo "All seven roster packages and the game runtime are ready for offline desktop builds."

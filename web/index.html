@@ -135,6 +135,21 @@
   .brain-consent button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--line); border-radius: 9px; background: #202a2d; color: var(--paper); cursor: pointer; }
   .brain-consent button.primary { background: var(--teal); border-color: transparent; color: #071112; font-weight: 700; }
   .brain-consent button:disabled { opacity: .45; cursor: not-allowed; }
+  .brain-import { position: fixed; inset: 0; z-index: 31; display: grid; place-items: center; padding: 20px; background: rgba(4, 8, 9, .88); }
+  .brain-import[hidden] { display: none; }
+  .brain-import section { width: min(820px, 100%); max-height: min(880px, calc(100vh - 40px)); overflow: auto; padding: 22px; border: 1px solid rgba(210, 220, 222, .18); border-radius: 18px; background: #11191b; box-shadow: 0 28px 100px #000a; }
+  .brain-import h2 { margin: 0 0 8px; font: 800 30px/1 var(--display); text-transform: uppercase; }
+  .brain-import p, .brain-import li { color: var(--muted); font-size: 12.5px; }
+  .brain-import ol { padding-left: 22px; }
+  .brain-import code { display: block; overflow-x: auto; margin: 8px 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #080d0f; color: var(--paper); white-space: pre; font: 11px/1.6 var(--mono); }
+  .brain-import .import-sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px; margin: 12px 0; }
+  .brain-import .import-source { padding: 8px 10px; border: 1px solid var(--glass-edge); border-radius: 8px; }
+  .brain-import .import-source b { display: block; font-size: 12px; }
+  .brain-import .import-source a { font-size: 11px; }
+  .brain-import .import-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 14px; }
+  .brain-import .import-check { display: flex; gap: 8px; align-items: flex-start; color: var(--paper); font-size: 12px; }
+  .brain-import .import-status { min-height: 20px; margin: 8px 0 0; color: var(--teal); }
+  .brain-import .import-status.error { color: #FBD9D3; }
 
   @media (max-width: 900px) {
     .ident h1 { font-size: 32px; } .ident p { display: none; }
@@ -171,6 +186,8 @@
   <label class="check" id="mouseRow" hidden><span><input type="checkbox" id="mouseOn" checked> Include mouse with synthetic visual-action readout</span></label>
   <button type="button" class="go" id="startBtn">Start this game</button>
   <p class="note" id="setupNote">A stage with two animals on it compares two mappings we wrote, not two animals. The fair opponent is the same brain with its wiring shuffled.</p>
+  <button type="button" id="brainImportBtn" hidden>Add local brain data…</button>
+  <input type="file" id="brainFolderInput" webkitdirectory directory multiple hidden>
   <h2>The roster</h2>
   <div class="roster" id="roster"></div>
 </section>
@@ -222,6 +239,24 @@
     </footer>
   </section>
 </div>
+<div class="brain-import" id="brainImport" hidden>
+  <section role="dialog" aria-modal="true" aria-labelledby="brainImportTitle">
+    <h2 id="brainImportTitle">Add local brain data</h2>
+    <p>The public app bundles the two datasets cleared for redistribution. You can add other species from files you have obtained and are allowed to use. The app stores the selected package on this device; it does not upload it.</p>
+    <ol>
+      <li>Download the <a href="https://github.com/kroryan/close-fly" target="_blank" rel="noopener">Open Fly source repository</a> and install Git and Python 3.</li>
+      <li>From the repository folder, run these commands. The exporter downloads or builds the roster packages into <code>web/species/</code> and checks each data manifest.</li>
+    </ol>
+    <code>python3 -m venv .venv
+.venv/bin/pip install numpy pandas openpyxl
+.venv/bin/python tools/fetch_stage_assets.py</code>
+    <p>Then choose the resulting <code>web/species</code> folder below, or choose one folder such as <code>web/species/mouse_v1</code>. Keep each package's metadata, manifest, and every file named by the manifest together. For source-specific access, attribution, and restrictions, use the links here. Importing files does not change their terms. <a href="https://github.com/kroryan/close-fly/blob/main/docs/local-brain-import.md" target="_blank" rel="noopener">Full import guide</a>.</p>
+    <div class="import-sources" id="brainImportSources"></div>
+    <label class="import-check"><input type="checkbox" id="brainImportCheck"> I have the right to use these local files and will follow the source conditions linked above.</label>
+    <p class="import-status" id="brainImportStatus" aria-live="polite"></p>
+    <div class="import-actions"><button type="button" id="brainImportCancel">Close</button><button type="button" class="go" id="brainChooseFolder" disabled>Choose brain folder…</button></div>
+  </section>
+</div>
 
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
@@ -230,6 +265,7 @@
 <script type="module">
 import { Encoder, choose, turnSeed, BRAIN_SEED, WINDOW_MS } from "./decide.js";
 import { installBrainCache, cachedBrainAsset, discardCachedBrainAsset } from "./brain-cache.js";
+import { importBrainFolder } from "./brain-import.js";
 
 const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -347,8 +383,8 @@ function requestPublicBrainConsent() {
   const remote = Boolean(delivery.brainRoot);
   $("brainConsentTitle").textContent = remote ? "Brain data download" : "Brain data terms";
   $("brainConsentIntro").textContent = remote
-    ? "This public build downloads only datasets whose catalogued terms allow public redistribution. Review the source and attribution for each included brain. Excluded datasets are not downloaded."
-    : "This public build includes only datasets whose catalogued terms allow public redistribution. Review the source and attribution for each included brain. Excluded datasets are not included.";
+    ? "This public build downloads only datasets whose catalogued terms allow public redistribution. Review each source and attribution. Other species can be added later from a local package you have the right to use."
+    : "This public build includes only datasets whose catalogued terms allow public redistribution. Review each source and attribution. Other species can be added later from a local package you have the right to use.";
   $("brainConsentNote").textContent = remote
     ? "Your choice is saved on this device for this terms revision. Acceptance does not replace or expand the source licences."
     : "Your choice is saved on this device for this terms revision. Included brain files are loaded only after acceptance.";
@@ -356,7 +392,7 @@ function requestPublicBrainConsent() {
   $("brainTerms").innerHTML = roster.map((s) => {
     const included = s.public_redistribute === true;
     const status = included ? (remote ? "Included · download after consent" : "Included · bundled in this build")
-      : `${remote ? "Not downloaded" : "Not included"} · rights not established for unrestricted redistribution`;
+      : "Not bundled · local import only · check source terms";
     const conditions = included ? (s.public_why || s.licence || s.license || "See source terms and retain attribution.")
       : (s.public_why || s.redistribute_why || "No public redistribution terms recorded.");
     const link = s.terms_url ? `<a href="${esc(s.terms_url)}" target="_blank" rel="noopener">Review source terms</a>` : "";
@@ -421,13 +457,14 @@ async function downloadPublicBrains(loadText) {
 async function readRoster() {
   const doc = await (await fetch("./roster.json")).json();
   roster = doc.species; delivery = doc.delivery || delivery;
+  $("brainImportBtn").hidden = delivery.profile !== "public";
   if (delivery.profile === "public") {
     brainRoot = delivery.brainRoot ? new URL(delivery.brainRoot, location.href).href : null;
     if (!await requestPublicBrainConsent()) throw new Error("Brain data terms were not accepted; startup cancelled.");
     if (brainRoot) await downloadPublicBrains($("loadText"));
   }
+  await installBrainCache(brainRoot, delivery.cacheVersion || "local");
   await Promise.all(roster.map(async (s) => {
-    if (s.public_disabled) return;
     try {
       const r = await fetch(brainResource(s, "metadata"), { cache: "no-cache" });
       if (r.ok && (r.headers.get("content-type") || "").includes("json")) available.set(s.id, await r.json());
@@ -435,22 +472,51 @@ async function readRoster() {
   }));
   $("roster").innerHTML = roster.map((s) => {
     const ok = available.has(s.id);
-    // A species that is here plays. One that is not says why -- and on the
-    // published site the usual reason is that its data may be used but not
-    // redistributed, so it has to be exported locally (tools/export_*.py).
-    // Not here, and not cleared to be served: that is the reason a visitor to
-    // the published page needs, not how to export it.
-    const held = s.public_disabled || (!available.has(s.id) && s.redistribute !== true);
-    const why = s.public_disabled ? `not included in this public build: ${s.public_why || "redistribution terms are not confirmed"}`
-      : held ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
-      : s.id === "mouse_v1" ? (available.has(s.id) ? "plays through a synthetic readout of visual-cortex activity; this dataset has no motor cortex" : "visual cortex model not packaged")
-      : s.blocker && available.has(s.id) ? (isWatcher(s) ? `watches from its tank; cannot act. ${s.blocker}` : s.blocker)
+    const why = ok && s.id === "mouse_v1" ? "visual cortex predictions · synthetic action readout"
+      : ok && s.blocker ? (isWatcher(s) ? `watches from its tank; cannot act. ${s.blocker}` : s.blocker)
       : ok ? `${fmt.format(available.get(s.id).n)} neurons`
-      : s.redistribute === false ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
-      : s.id === "zebrafish_larva" ? "needs a Fish1 export (a personal CAVE token)" : "not exported yet";
+      : s.public_disabled ? `not bundled · add its local package above · ${s.public_why || s.redistribute_why || "check source terms"}`
+      : s.id === "mouse_v1" ? "local visual cortex model package not loaded"
+      : s.redistribute === false ? `not loaded · ${s.redistribute_why || "use an authorized local export"}`
+      : s.id === "zebrafish_larva" ? "needs a Fish1 export (a personal CAVE token)" : "brain package not loaded";
     return `<div><b>${esc(label(s))}</b><span class="why${s.warning && ok ? " warn" : ""}">${esc(why)}${s.warning && ok ? " ⚠" : ""}</span></div>`;
   }).join("");
 }
+
+function openBrainImport() {
+  $("brainImportStatus").className = "import-status";
+  $("brainImportStatus").textContent = "";
+  $("brainImportCheck").checked = false;
+  $("brainChooseFolder").disabled = true;
+  $("brainImportSources").innerHTML = roster.map((s) => `<div class="import-source"><b>${esc(s.name)} · ${esc(s.detail)}</b><a href="${esc(s.terms_url || "https://github.com/kroryan/close-fly")}" target="_blank" rel="noopener">Dataset source and terms</a></div>`).join("");
+  $("brainImport").hidden = false;
+}
+$("brainImportBtn").addEventListener("click", openBrainImport);
+$("brainImportCancel").addEventListener("click", () => { $("brainImport").hidden = true; });
+$("brainImportCheck").addEventListener("change", (event) => { $("brainChooseFolder").disabled = !event.target.checked; });
+$("brainChooseFolder").addEventListener("click", () => $("brainFolderInput").click());
+$("brainFolderInput").addEventListener("change", async (event) => {
+  const files = event.target.files;
+  if (!files || !files.length) return;
+  const status = $("brainImportStatus");
+  status.className = "import-status";
+  status.textContent = `Checking ${files.length} files…`;
+  try {
+    await installBrainCache(null, "local-import");
+    const result = await importBrainFolder(files, roster, (done, total) => {
+      status.textContent = `Saving local package ${done}/${total}…`;
+    });
+    const names = result.imported.map((item) => item.name).join(", ");
+    const omitted = result.skipped.length ? ` Skipped incomplete folders: ${result.skipped.join("; ")}.` : "";
+    status.textContent = `Added ${names}.${omitted} Reloading the stage…`;
+    setTimeout(() => location.reload(), 900);
+  } catch (error) {
+    status.className = "import-status error";
+    status.textContent = String(error && error.message || error);
+  } finally {
+    event.target.value = "";
+  }
+});
 // A species whose roster row names a blocker is shown, with the blocker, and not
 // offered: by PREREGISTRATION.md a seat whose senses reach no neuron never acts.
 // A blocker keeps a species off the stage -- unless it can still be WATCHED,
@@ -1236,12 +1302,20 @@ function buildMouse(n, total) {
   m.frame = document.createElement("canvas"); m.frame.width = 256; m.frame.height = 144;
   if (!mouseWorker) {
     mouseWorker = rpcWorker("./mouse-worker.js");
-    let rejectLoad;
+    let rejectLoad, phase = "starting the local model";
     mouseLoaded = new Promise((res, rej) => { rejectLoad = rej; mouseWorker.on((msg) => {
-      if (msg.type === "progress" && G.mouse) { G.mouse.stateLine = msg.message; drawMouseMonitor(G.mouse); }
+      if (msg.type === "progress" && G.mouse) { phase = msg.message; G.mouse.stateLine = phase; drawMouseMonitor(G.mouse); showBoard(); }
       if (msg.type === "loaded") res(msg);
       if (msg.type === "error") rej(new Error(msg.message));
     }); });
+    const loadStarted = Date.now();
+    const statusTimer = setInterval(() => {
+      if (!G.mouse || G.mouse.state !== "load") return;
+      const elapsed = Math.floor((Date.now() - loadStarted) / 1000);
+      const time = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+      G.mouse.stateLine = `${phase} · ${time}`;
+      drawMouseMonitor(G.mouse); showBoard();
+    }, 1000);
     const loadTimeout = setTimeout(() => {
       if (G.mouse && G.mouse.state === "load") {
         mouseWorker.kill();
@@ -1254,7 +1328,7 @@ function buildMouse(n, total) {
       }
     }, 120000);
     mouseWorker.post({ type: "load", base: brainBase(species), root: brainRoot, cacheVersion: delivery.cacheVersion });
-    mouseLoaded.finally(() => clearTimeout(loadTimeout)).catch(() => {});
+    mouseLoaded.finally(() => { clearTimeout(loadTimeout); clearInterval(statusTimer); }).catch(() => {});
   }
   mouseLoaded.then(({ meta, ep }) => {
     m.meta = meta; m.ep = ep; m.state = "ready";
@@ -1457,7 +1531,7 @@ function showBoard() {
       ${s.watcher ? `<div class="warn">⚠ ${esc((s.species.why_no_seat || "").split(". ")[0] || "shown the game, but it gives no orders")}. Its senses fire; nothing reaches its motor neurons.</div>` : ""}
       <div class="orders">${t ? (t.orders.length ? t.orders.slice(0, 4).map(([m, n]) => `<b>${esc(n)}</b>`).join(" · ") + (t.orders.length > 4 ? ` +${t.orders.length - 4}` : "") : "holds") : "&nbsp;"}</div></div>`;
   }).join("") + (G.mouse ? (() => { const m = G.mouse;
-    const st = m.state === "fault" ? `<span class="state fault">faulted</span>` : m.busy ? `<span class="state think">looking…</span>` : m.state === "load" ? `<span class="state think">loading</span>` : `<span class="state">${m.ms ? (m.ms / 1000).toFixed(2) + " s · " + m.ep : ""}</span>`;
+    const st = m.state === "fault" ? `<span class="state fault">faulted</span>` : m.busy ? `<span class="state think">looking…</span>` : m.state === "load" ? `<span class="state think">${esc(m.stateLine || "loading")}</span>` : `<span class="state">${m.ms ? (m.ms / 1000).toFixed(2) + " s · " + m.ep : ""}</span>`;
     return `<div class="card" style="--c:${MOUSE_COLOR}"><div class="who"><strong>Mouse · visual cortex</strong>${st}</div>
       <div class="who"><span>watches the world · does not play</span><span>${m.meta ? fmt.format(m.meta.n) + " recorded neurons" : ""}</span></div>
       <div class="orders">${m.looks ? `${fmt.format(m.above)} predicted above their usual level after ${m.looks} look${m.looks > 1 ? "s" : ""}` : "&nbsp;"}</div></div>`; })() : "");

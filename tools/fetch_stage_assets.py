@@ -71,11 +71,6 @@ def fetch_remote_packages():
         else:
             fetch(BASE + f"species/{sid}/connectome.bin", folder / "connectome.bin")
     fetch(BASE + "species/drosophila_female/positions.bin", ROOT / "web/species/drosophila_female/positions.bin")
-    folder = ROOT / "web" / "species" / "mouse_v1"
-    fetch(BASE + "species/mouse_v1/mouse.json", folder / "mouse.json")
-    fetch_packed("mouse_v1", "model")
-
-
 def local_species(py):
     cache = ROOT / ".cache" / "open-animal-stage"
     if not (cache / ".git").exists():
@@ -98,18 +93,13 @@ def local_species(py):
 def verify(sid):
     folder = ROOT / "web" / "species" / sid
     meta = folder / "brain.json"
-    if sid == "mouse_v1":
-        meta = folder / "mouse.json"
     if not meta.is_file(): raise RuntimeError(f"{sid}: missing {meta}")
-    if sid != "mouse_v1":
-        manifest_path = folder / "connectome.pack.json"
-        if not manifest_path.exists():
-            raw = folder / "connectome.bin"
-            if not raw.exists(): raise RuntimeError(f"{sid}: missing connectome")
-            subprocess.run([sys.executable, str(ROOT / "tools/pack_web.py"), "--no-gzip", str(raw)], check=True)
-        m = json.loads(manifest_path.read_text())
-    else:
-        m = json.loads((folder / "model.pack.json").read_text())
+    manifest_path = folder / "connectome.pack.json"
+    if not manifest_path.exists():
+        raw = folder / "connectome.bin"
+        if not raw.exists(): raise RuntimeError(f"{sid}: missing connectome")
+        subprocess.run([sys.executable, str(ROOT / "tools/pack_web.py"), "--no-gzip", str(raw)], check=True)
+    m = json.loads(manifest_path.read_text())
     for part in m["parts"]:
         if not (folder / part).is_file(): raise RuntimeError(f"{sid}: missing {part}")
     expected = m["sha256"]
@@ -129,7 +119,7 @@ def main():
     args = ap.parse_args()
     fetch_remote_packages()
     local_species(args.python)
-    for sid in ("drosophila_female", "drosophila_male", "drosophila_larva", "c_elegans_herm", "c_elegans_male", "ciona_larva", "zebrafish_larva", "mouse_v1"):
+    for sid in ("drosophila_female", "drosophila_male", "drosophila_larva", "c_elegans_herm", "c_elegans_male", "ciona_larva", "zebrafish_larva"):
         verify(sid)
 
 

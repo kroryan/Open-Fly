@@ -24,7 +24,7 @@ self.onmessage = async (e) => {
   try {
     if (msg.type === "load") {
       const base = new URL(msg.base, self.location.href);
-      if (msg.root) await installBrainCache(msg.root, msg.cacheVersion);
+      await installBrainCache(msg.root || null, msg.cacheVersion || "local");
       const meta = await (await fetch(new URL("brain.json", base))).json();
       const connectome = await fetchConnectome(base, meta);
       brain = new AnimalBrain(connectome, meta);

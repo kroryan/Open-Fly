@@ -5,15 +5,15 @@ Code in this repository is licensed under the Apache License 2.0 (LICENSE).
 
 Third-party code and assets:
 
-- Open Animal Stage runtime code and the eight animal GLB models were adapted
+- Open Animal Stage runtime code and the seven animal GLB models were adapted
   from Pr1nted/Open-Animal-Stage at commit
   4cb2c8610c801febf355279e58a920897ce99e3e, Apache-2.0. License text:
   web/vendor/licenses/OPEN-ANIMAL-STAGE-APACHE-2.0.txt.
 - OpenDoctrinesAgent and its game engine are built from Open Doctrines under
   that project's licence. The local-only build applies the stage and unlimited
   turn patches in patches/ to a temporary worktree.
-- onnxruntime-web 1.30.0, MIT; Three.js r128, MIT; fflate 0.8.2, MIT. License
-  texts are in web/vendor/licenses/.
+- Three.js r128, MIT; fflate 0.8.2, MIT. License texts are in
+  web/vendor/licenses/.
 - Fonts bundled under web/vendor/fonts/ are Big Shoulders Display, Figtree and
   JetBrains Mono, licensed under SIL OFL 1.1; texts are in web/vendor/licenses/.
 
@@ -21,7 +21,6 @@ Brain datasets are generated or downloaded into ignored web/species/ for local
 desktop builds and are not committed or pushed. The catalogue web/roster.json
 records their source, attribution, availability and per-package terms. In
 particular, FlyWire is CC BY-NC 4.0; Winding et al. larva and Cook et al.
-hermaphrodite/male worm exports have no stated open redistribution licence;
-MICrONS digital-twin weights have no stated licence. Those packages are for
-the owner's local builds only. Build outputs are also ignored and are not
-published by the source push.
+hermaphrodite/male worm exports have no stated open redistribution licence.
+Those packages are for the owner's local builds only. Build outputs are also
+ignored and are not published by the source push.

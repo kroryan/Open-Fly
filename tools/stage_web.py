@@ -47,12 +47,6 @@ def main():
         if relroot.startswith("species"):
             dirs[:] = []
             continue
-        # The public deploy does not publish the mouse's unlicensed model
-        # weights, so its 28 MB ONNX WASM backend is not needed there either.
-        # Desktop stages keep this runtime and load it fully offline.
-        if relroot == os.path.join("vendor", "onnxruntime-web"):
-            dirs[:] = []
-            continue
         for name in files:
             src = os.path.join(root, name)
             if name in SKIP_NAMES or src in packed:

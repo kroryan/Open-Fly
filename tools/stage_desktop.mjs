@@ -72,9 +72,7 @@ for (const species of roster.species) {
   if (!metadata) throw new Error(`catalogue ${species.id} has no metadata resource`);
   const base = path.join(web, metadata);
   if (!await exists(base)) throw new Error(`${species.id}: missing metadata ${metadata}`);
-  if (species.id === "mouse_v1") {
-    if (!await exists(path.join(web, resources.modelWeights || ""))) throw new Error("mouse model weights are missing");
-  } else if (!await exists(path.join(web, resources.connectome || ""))) {
+  if (!await exists(path.join(web, resources.connectome || ""))) {
     throw new Error(`${species.id}: connectome package is missing`);
   }
 }
@@ -105,7 +103,6 @@ for (const src of files) {
   const rel = path.relative(web, src).split(path.sep).join("/");
   if (profile === "public" && rel.startsWith("species/") && !publicSpecies.has(rel.split("/")[1])) continue;
   if (profile === "public" && rel.startsWith("data/")) continue;
-  if (profile === "public" && (rel === "mouse-worker.js" || rel.startsWith("vendor/onnxruntime-web/"))) continue;
   if (rel === "roster.json") continue;
   const dst = path.join(out, path.relative(web, src));
   await mkdir(path.dirname(dst), { recursive: true });
