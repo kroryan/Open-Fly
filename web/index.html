@@ -1,15 +1,18 @@
+<!doctype html>
 <meta charset="utf-8">
-<title>Open Fly</title>
+<title>Open Fly · Animal Stage</title>
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<meta name="description" content="Mapped animal brains play Open Doctrines against each other, live in your browser.">
+<link rel="stylesheet" href="./vendor/fonts.css">
 <style>
+  /* Open Fly's palette and furniture, deliberately: the two pages are one
+     project. The room is the same room with more tenants in it. */
   :root {
     --room: #0C1113;
-    --glass: rgba(10, 16, 18, 0.8);
+    --glass: rgba(10, 16, 18, 0.82);
     --glass-edge: rgba(237, 230, 214, 0.10);
     --paper: #EDE6D6;
     --muted: #8F9A97;
@@ -30,249 +33,164 @@
   .glass { background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   button, select { font: 500 12.5px/1 var(--body); color: var(--paper); background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
   button:hover, select:hover { border-color: rgba(242, 184, 75, 0.55); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
   button:focus-visible, select:focus-visible, #stage:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  a { color: var(--amber); }
 
-  .ident { position: fixed; top: 18px; left: 20px; max-width: 400px; pointer-events: none; }
-  .ident h1 { margin: 0; font: 800 44px/0.9 var(--display); letter-spacing: 0.01em; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+  .ident { position: fixed; top: 18px; left: 20px; max-width: 420px; pointer-events: none; }
+  .ident h1 { margin: 0; font: 800 44px/0.9 var(--display); letter-spacing: 0.01em; text-transform: uppercase; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .ident h1 span { color: var(--amber); }
   .live { font: 600 11px/1 var(--mono); letter-spacing: 0.14em; color: #FBD9D3; background: rgba(224, 98, 79, 0.2); border: 1px solid rgba(224, 98, 79, 0.5); border-radius: 999px; padding: 5px 9px 5px 8px; display: inline-flex; gap: 6px; align-items: center; font-style: normal; }
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--war); display: inline-block; animation: beat 1.4s ease-in-out infinite; }
   @keyframes beat { 50% { opacity: 0.25; } }
   .ident p { margin: 8px 0 0; color: var(--muted); font-size: 13px; text-wrap: balance; }
 
-  .views { position: fixed; top: 18px; right: 20px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
-  .views button { border-radius: 999px; padding: 8px 12px; }
+  .views { position: fixed; top: 18px; right: 20px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 58vw; }
+  .views button { border-radius: 999px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 7px; }
+  .views button i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   .views button[aria-pressed="true"] { background: var(--amber); color: #1B1406; border-color: var(--amber); }
 
-  .setup { position: fixed; left: 20px; top: 132px; width: 250px; border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
-  .setup h2 { margin: 0; }
+  .setup { position: fixed; left: 20px; top: 150px; width: 330px; max-height: calc(100vh - 250px); overflow-y: auto; border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
+  .setup[data-open="false"] > :not(h2) { display: none; }
+  .setup h2, .rail h2 { margin: 0; font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .fold { all: unset; cursor: pointer; display: flex; flex: 1; justify-content: space-between; align-items: center; }
+  /* The map importer lives in the header, not inside the panel: on a narrow
+     window the panel starts folded, and a button inside it was invisible. */
+  .setuphead { display: flex; gap: 10px; align-items: center; }
+  .setuphead #importBtn { font: 600 11px/1 var(--body); letter-spacing: 0.04em; text-transform: none; padding: 6px 9px; border-radius: 999px; white-space: nowrap; }
   .setup label { display: grid; gap: 5px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .setup select { width: 100%; text-transform: none; letter-spacing: 0; }
-  .setup .row { display: flex; gap: 6px; }
-  .setup .row > * { flex: 1; }
-  .setup .go { background: var(--amber); color: #1B1406; border-color: var(--amber); font-weight: 600; }
-  .setup .note { font-size: 12px; color: var(--muted); margin: 0; }
-  #importFile { display: none; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { border-radius: 999px; padding: 6px 10px; font-size: 12px; }
+  .seatrows { display: grid; gap: 8px; }
+  .seatrow { border: 1px solid var(--glass-edge); border-left: 3px solid var(--c); border-radius: 10px; padding: 8px; display: grid; gap: 6px; }
+  .seatrow .top { display: flex; gap: 6px; align-items: center; }
+  .seatrow .top select { flex: 1; min-width: 0; }
+  .seatrow .row2 { display: flex; gap: 6px; }
+  .seatrow .row2 select { flex: 1; min-width: 0; }
+  .seatrow .x { padding: 6px 9px; }
+  .go { background: var(--amber) !important; color: #1B1406 !important; border-color: var(--amber) !important; font-weight: 600 !important; }
+  .note { font-size: 12px; color: var(--muted); margin: 0; }
+  .note.warn { color: #FBD9D3; }
+  .setup .check span { display: flex; gap: 8px; align-items: center; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--paper); }
+  .roster { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .roster div { display: flex; justify-content: space-between; gap: 8px; }
+  .roster b { font-weight: 500; color: var(--paper); }
+  .roster .why { font-size: 11px; text-align: right; }
 
-  .rail { position: fixed; top: 76px; right: 20px; width: 300px; max-height: calc(100vh - 170px); overflow-y: auto; border-radius: 14px; padding: 16px 16px 14px; display: grid; gap: 14px; }
-  .gamehead { display: grid; gap: 2px; }
-  .label { font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-  .gamehead .who { font: 800 26px/1 var(--display); text-transform: uppercase; letter-spacing: 0.01em; }
-  .gamehead .turn { font: 400 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 0; }
-  .stats div { display: grid; gap: 2px; }
-  .stats dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-  .stats dd { margin: 0; font: 600 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
-  .warline { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 22px; }
-  .chip { font: 600 11px/1 var(--mono); padding: 5px 7px; border-radius: 6px; background: rgba(224, 98, 79, 0.16); color: #F3A396; border: 1px solid rgba(224, 98, 79, 0.35); }
-  .peace { color: var(--muted); font-size: 12.5px; }
-  h2 { margin: 0 0 6px; font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); }
-  .orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
-  .orders li { display: grid; grid-template-columns: 74px 1fr; gap: 8px; font-size: 13px; }
-  .orders li span:first-child { color: var(--muted); font-size: 12px; }
-  .orders .none { color: var(--muted); display: block; grid-column: 1 / -1; }
-  .spikes { font: 600 22px/1 var(--mono); font-variant-numeric: tabular-nums; }
-  .spikes small { font: 400 12px var(--body); color: var(--muted); margin-left: 6px; }
-  .bars { display: grid; gap: 6px; }
-  .bar { display: grid; grid-template-columns: 96px 1fr 38px; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
-  .bar i { display: block; height: 6px; border-radius: 3px; background: rgba(237, 230, 214, 0.08); overflow: hidden; }
-  .bar i b { display: block; height: 100%; width: 0; background: var(--teal); border-radius: 3px; transition: width 160ms linear; }
-  .bar output { font: 400 11.5px var(--mono); text-align: right; color: var(--paper); font-variant-numeric: tabular-nums; }
-  .record { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .record li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: baseline; font: 400 12px var(--mono); font-variant-numeric: tabular-nums; }
-  .record li .iso { color: var(--paper); font-weight: 600; }
-  .record li .how { color: var(--muted); font-family: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .record li .up { color: var(--good); }
-  .record li .down { color: #F3A396; }
-  .record .empty { color: var(--muted); font-family: var(--body); display: block; grid-column: 1 / -1; }
+  .rail { position: fixed; top: 76px; right: 20px; width: 360px; max-height: calc(100vh - 176px); overflow-y: auto; border-radius: 14px; padding: 14px 14px 12px; display: grid; gap: 10px; align-content: start; }
+  .gamehead .label { font: 600 11px/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .gamehead .turn { display: block; font: 800 26px/1.05 var(--display); text-transform: uppercase; margin-top: 4px; }
+  .board { display: grid; gap: 8px; }
+  .card { border: 1px solid var(--glass-edge); border-left: 3px solid var(--c); border-radius: 10px; padding: 9px 10px; display: grid; gap: 5px; }
+  .card .who { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+  .card .who strong { font: 600 14px/1.2 var(--body); }
+  .card .who span { font: 600 11px/1 var(--mono); color: var(--muted); }
+  .card .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font: 500 12px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  .card .nums small { display: block; font: 500 10px/1.2 var(--body); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .card .orders { font-size: 12px; color: var(--muted); }
+  .card .orders b { color: var(--paper); font-weight: 500; }
+  .card .state { font: 600 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .card .warn { font-size: 11.5px; color: #FBD9D3; background: rgba(224,98,79,.14); border: 1px solid rgba(224,98,79,.4); border-radius: 8px; padding: 6px 8px; }
+  .roster .warn { color: #FBD9D3; }
+  .card .state.think { color: var(--teal); } .card .state.dead { color: var(--war); } .card .state.fault { color: var(--war); }
+  .up { color: var(--good); } .down { color: var(--war); }
+  .fine { font-size: 11.5px; color: var(--muted); margin: 0; }
 
-  .statusbar { position: fixed; left: 20px; right: 340px; bottom: 18px; border-radius: 14px; padding: 10px 14px; display: grid; grid-template-columns: minmax(200px, 320px) 1fr; gap: 16px; align-items: center; }
-  .statusbar .now { display: grid; gap: 3px; }
-  .statusbar .now strong { font: 600 13.5px/1.2 var(--body); }
-  .statusbar .now span { font: 400 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .spark { position: relative; height: 44px; }
-  .spark canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .statusbar { position: fixed; left: 20px; right: 400px; bottom: 18px; border-radius: 14px; padding: 10px 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; align-items: center; }
+  .now strong { display: block; font: 600 14px/1.2 var(--body); }
+  .now span { color: var(--muted); font-size: 12.5px; }
+  .spark canvas { width: 100%; height: 48px; display: block; }
 
-  .loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--room); z-index: 5; transition: opacity 400ms ease; }
+  .pov { position: fixed; right: 20px; top: 76px; width: 380px; border-radius: 14px; padding: 14px; display: grid; gap: 8px; z-index: 5; }
+  .pov[hidden] { display: none; }
+  .pov strong { font: 600 12px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); }
+  .pov p { margin: 0; font-size: 12px; color: var(--muted); }
+  .pov canvas { width: 100%; border-radius: 8px; background: #000; }
+  body.in-pov .rail, body.in-pov .setup, body.in-pov .ident p { display: none; }
+  #stage.mouse-eye { filter: url(#mouse-dichromat) blur(3px); image-rendering: auto; }
+  .loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--room); z-index: 10; transition: opacity .5s; }
   .loading[data-done="true"] { opacity: 0; pointer-events: none; }
-  .loading div { display: grid; gap: 10px; justify-items: center; text-align: center; }
-  .loading strong { font: 800 28px/1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
-  .loading p { margin: 0; color: var(--muted); font: 400 12.5px var(--mono); max-width: 480px; }
-  .loading .err { color: #F3A396; }
-
-  /* ── THE ONE ASK, AT THE ONLY MOMENT IT IS EARNED ──
-   *
-   * A post that did 32,000 views on 16 Sep 2026 sent 141 people to this page
-   * and about 97 of them watched a fly run a country. Open Doctrines, the game
-   * the post was about, saw no measurable lift at all: its graphs are flat
-   * through that day while this page's are a cliff. People arrived, enjoyed it,
-   * and left, because nothing here ever handed them the game.
-   *
-   * So this appears when a run ENDS -- the fly wiped out, or its 120 turns
-   * done -- and not before. That is the moment somebody has just spent five
-   * minutes watching and has nothing else to do. It is not a banner, it does
-   * not cover the room, and it never appears during a game.
-   *
-   * IT STAYS once shown. The between-games pause is eight seconds; a card that
-   * left with it would be missed by exactly the people who are about to close
-   * the tab, who are the people it is for.
-   *
-   * NOT IN THE RAIL, which is display:none under 900px. A card only the
-   * desktop saw would miss the share of that Reddit traffic reading on a
-   * phone. */
-  .pitch { position: fixed; right: 20px; bottom: 96px; width: 300px; border-radius: 14px;
-           padding: 14px 16px; display: none; gap: 8px; z-index: 4; }
-  .pitch[data-show="true"] { display: grid; }
-  .pitch strong { font: 800 19px/1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; color: var(--amber); }
-  .pitch p { margin: 0; font-size: 13px; color: var(--muted); }
-  .pitch a { display: block; text-align: center; padding: 9px 12px; border-radius: 8px;
-             background: var(--amber); color: #14100A; font-weight: 700; font-size: 13.5px;
-             text-decoration: none; }
-  .pitch a:hover { background: #F7C766; }
-  .pitch small { font-size: 11.5px; color: var(--muted); text-align: center; }
-  .pitch button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 11.5px;
-                  cursor: pointer; padding: 0; text-align: center; }
-  .pitch button:hover { color: var(--paper); }
-
-  /* ── THE MENU HAS TO GET OUT OF THE WAY ──
-   *
-   * On a phone the rail is gone and this panel sat across the bottom third of
-   * the screen for the whole session, so what was left of a 3D room built to
-   * be looked around was a strip between the panel and the camera buttons.
-   * The panel is called "the next game": it is optional, and the room is the
-   * thing people came for.
-   *
-   * So it folds, and on a phone it starts folded. The heading is the control,
-   * because a heading somebody can already see costs no space and a separate
-   * button would. Hiding the children rather than wrapping them keeps the
-   * two-column grid below intact. */
-  .fold { all: unset; cursor: pointer; display: flex; width: 100%; align-items: center;
-          justify-content: space-between; gap: 10px; font: inherit; color: inherit;
-          letter-spacing: inherit; text-transform: inherit; }
-  .fold i { font-style: normal; font-family: var(--mono); font-size: 14px; line-height: 1;
-            color: var(--muted); }
-  .fold:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
-  .setup[data-open="false"] > *:not(h2) { display: none; }
-  .setup[data-open="false"] { padding-bottom: 12px; }
+  .loading div { text-align: center; max-width: 440px; padding: 0 16px; }
+  .loading strong { font: 800 34px/1 var(--display); text-transform: uppercase; }
+  .loading p { color: var(--muted); }
+  .loading .err { color: #FBD9D3; }
 
   @media (max-width: 900px) {
-    .ident p { display: none; }
-    /* The bottom of a phone, stacked: status bar, then the folded menu, then
-     * the ask when a run ends. Each clears the one below it. */
-    .statusbar { left: 12px; right: 12px; bottom: 12px; grid-template-columns: 1fr; }
-    /* MEASURED, NOT GUESSED. The first version put the menu at a hand-picked
-     * 72px and it landed underneath the status bar, which is 117px tall on a
-     * phone because it stacks into one column and carries the spark chart.
-     * --barH and --setupH are written from the real boxes after layout, so
-     * this stack cannot drift when either of them changes. */
-    .setup { top: auto; bottom: calc(var(--barH, 117px) + 24px); left: 12px; width: auto; right: 12px;
-             grid-template-columns: 1fr 1fr;
-             max-height: calc(100vh - var(--barH, 117px) - 190px); overflow-y: auto; }
-    .setup h2, .setup .note { grid-column: 1 / -1; }
-    .pitch { left: 12px; right: 12px; width: auto;
-             bottom: calc(var(--barH, 117px) + var(--setupH, 42px) + 34px); }
-    .rail { display: none; }
-    .views { max-width: none; left: 12px; justify-content: flex-start; top: 70px; }
+    .ident h1 { font-size: 32px; } .ident p { display: none; }
+    .views { top: auto; bottom: 150px; left: 16px; right: 16px; max-width: none; justify-content: flex-start; }
+    .setup { top: 70px; left: 16px; right: 16px; width: auto; max-height: 50vh; }
+    .rail { top: auto; bottom: 200px; left: 16px; right: 16px; width: auto; max-height: 28vh; }
+    .statusbar { left: 16px; right: 16px; bottom: 16px; grid-template-columns: 1fr; }
   }
-  .setup .credit { font-size: 11px; line-height: 1.45; padding-top: 8px; border-top: 1px solid var(--glass-edge); }
-  .setup .credit a { color: inherit; }
-  @media (prefers-reduced-motion: reduce) { .loading, .bar i b { transition: none; } .live i { animation: none; } }
 </style>
 
-<canvas id="stage" tabindex="0" aria-label="3D scene: a simulated fruit fly brain at a desk playing Open Doctrines in this browser, with its brain beside it. Drag to look, W A S D to fly."></canvas>
+<canvas id="stage" tabindex="0" aria-label="3D scene: a room of stations, one per animal, each brain playing Open Doctrines on its own monitor. Drag to look, W A S D to move."></canvas>
 
 <header class="ident">
-  <h1>Open <span>Fly</span> <em class="live"><i></i>LIVE</em></h1>
-  <p>A simulated fruit fly brain &mdash; the FlyWire connectome, 138,639 neurons &mdash; playing Open Doctrines. Both run here, in your browser: every order comes from spikes computed on this machine.</p>
+  <h1>Open Animal <span>Stage</span> <em class="live"><i></i>LIVE</em></h1>
+  <p>Mapped brains playing Open Doctrines against each other, in one world. Every brain and the game run here, in your browser: every order comes from spikes computed on this machine.</p>
 </header>
 
-<section class="setup glass" id="setup" data-open="true" aria-label="Game setup">
-  <h2><button type="button" class="fold" id="setupFold" aria-expanded="true" aria-controls="setup">The next game<i aria-hidden="true">&minus;</i></button></h2>
-  <label>Map
-    <select id="mapSelect"><option>Loading maps&hellip;</option></select>
-  </label>
-  <div class="row">
-    <button type="button" id="importBtn">Import .odmap</button>
-  </div>
-  <input type="file" id="importFile" accept=".odmap">
-  <label>Country
-    <select id="countrySelect"><option value="">Random country</option></select>
-  </label>
+<section class="setup glass" id="setup" data-open="true" aria-label="Who plays">
+  <h2 class="setuphead"><button type="button" class="fold" id="setupFold" aria-expanded="true">Who plays next<i aria-hidden="true">&minus;</i></button><button type="button" id="importBtn" title="Play on your own map (or drop an .odmap anywhere on the page)">Import .odmap</button></h2>
+  <div class="presets" id="presets"></div>
+  <div class="seatrows" id="seatRows"></div>
+  <button type="button" id="addSeat">Add an animal</button>
+  <label>Map <select id="mapSelect"><option>Loading maps&hellip;</option></select></label>
+  <input type="file" id="importFile" accept=".odmap" hidden>
   <label>Speed
     <select id="speedSelect">
-      <option value="0">As fast as it thinks</option>
+      <option value="0">As fast as they think</option>
       <option value="1200" selected>Watchable</option>
       <option value="3000">Slow</option>
     </select>
   </label>
+  <label class="check" id="mouseRow" hidden><span><input type="checkbox" id="mouseOn" checked> Include mouse with synthetic visual-action readout</span></label>
   <button type="button" class="go" id="startBtn">Start this game</button>
-  <p class="note" id="setupNote">If the fly's country is wiped out, a random game moves on to a new country; a country you picked starts again with a new seed.</p>
-  <p class="note credit">Connectome: <a href="https://flywire.ai" target="_blank" rel="noopener">FlyWire</a>, Princeton University and collaborators, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>, converted for the browser. Brain model: Shiu et al., <i>Nature</i> 2024. <a href="./data/LICENSE.txt" target="_blank" rel="noopener">Data licence and citations</a></p>
+  <p class="note" id="setupNote">A stage with two animals on it compares two mappings we wrote, not two animals. The fair opponent is the same brain with its wiring shuffled.</p>
+  <h2>The roster</h2>
+  <div class="roster" id="roster"></div>
 </section>
 
-<nav class="views" aria-label="Camera views">
-  <button type="button" data-view="shoulder" aria-pressed="true">Over its shoulder</button>
-  <button type="button" data-view="screen" aria-pressed="false">The screen</button>
-  <button type="button" data-view="brain" aria-pressed="false">The brain</button>
-  <button type="button" data-view="world" aria-pressed="false">The world</button>
-  <button type="button" data-view="wide" aria-pressed="false">Wide</button>
-</nav>
+<nav class="views" id="views" aria-label="Camera views"></nav>
 
 <aside class="rail glass" aria-live="polite">
   <div class="gamehead">
     <span class="label" id="gameLabel">Getting ready</span>
-    <span class="who" id="gameWho">&mdash;</span>
-    <span class="turn" id="gameTurn">&nbsp;</span>
+    <span class="turn" id="gameTurn">&mdash;</span>
   </div>
-  <dl class="stats">
-    <div><dt>Land</dt><dd id="land">&mdash;</dd></div>
-    <div><dt>Army</dt><dd id="army">&mdash;</dd></div>
-    <div><dt>Treasury</dt><dd id="treasury">&mdash;</dd></div>
-    <div><dt>At war with</dt><dd><span class="warline" id="war"><span class="peace">nobody</span></span></dd></div>
-  </dl>
-  <section>
-    <h2>Its orders this turn</h2>
-    <ul class="orders" id="orders"><li><span class="none">Not yet</span></li></ul>
-  </section>
-  <section>
-    <h2>Its brain this turn</h2>
-    <div class="spikes"><span id="spikes">0</span><small>descending-neuron spikes</small></div>
-    <div class="bars">
-      <label class="bar">Sugar &middot; treasury<i><b id="bSugar"></b></i><output id="oSugar">0</output></label>
-      <label class="bar">Bitter &middot; losses<i><b id="bBitter"></b></i><output id="oBitter">0</output></label>
-      <label class="bar">Water &middot; land<i><b id="bWater"></b></i><output id="oWater">0</output></label>
-      <label class="bar">Hearing &middot; war<i><b id="bJon"></b></i><output id="oJon">0</output></label>
-    </div>
-  </section>
-  <section>
-    <h2>Its record</h2>
-    <ul class="record" id="record"><li><span class="empty">No finished games yet</span></li></ul>
-  </section>
-</aside>
-
-<aside class="pitch glass" id="pitch">
-  <strong id="pitchTitle">The fly is bad at this</strong>
-  <p id="pitchLine">You would probably do better.</p>
-  <a href="https://pr1nted.itch.io/open-doctrines" id="pitchLink">Play Open Doctrines</a>
-  <small>Free, in a browser, no account.</small>
-  <button type="button" id="pitchHide">Not now</button>
+  <div class="board" id="board"></div>
+  <p class="fine" id="fine">Brains beside each animal: the female fly's neurons are where FlyWire put them; every other brain is laid out by role (senses in front, motor neurons behind), not by anatomy.</p>
 </aside>
 
 <div class="statusbar glass">
-  <div class="now"><strong id="nowTitle">Waking the fly&hellip;</strong><span id="nowDetail">&nbsp;</span></div>
-  <div class="spark"><canvas id="spark" aria-label="Land held this game, turn by turn"></canvas></div>
+  <div class="now"><strong id="nowTitle">Opening the room&hellip;</strong><span id="nowDetail">&nbsp;</span></div>
+  <div class="spark"><canvas id="spark" aria-label="Land held by each animal, turn by turn"></canvas></div>
 </div>
 
-<div class="loading" id="loading">
-  <div>
-    <strong>Waking the fly</strong>
-    <p id="loadText">Loading the room&hellip;</p>
-  </div>
-</div>
+<!-- MOUSE VISION. Mice have two cone types, M (~510 nm, green) and S
+     (~360 nm, ultraviolet), and none tuned to red, so red reads as dark. The
+     matrix below maps the screen's RGB onto that: an M channel shown as green,
+     an S channel shown as blue-violet, and no red. It is a simulation of a
+     dichromat on a screen that cannot show ultraviolet, and is labelled so. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="mouse-dichromat" color-interpolation-filters="linearRGB">
+  <feColorMatrix type="matrix" values="0.08 0.24 0.02 0 0   0.12 0.78 0.10 0 0   0.02 0.18 0.80 0 0   0 0 0 1 0"/>
+</filter></svg>
+<aside class="pov glass" id="pov" hidden>
+  <strong>Through the mouse's eyes</strong>
+  <p>The room from the mouse's head, as a mouse's eye resolves it: about 1% of human sharpness, and two colours, green and ultraviolet, with no red. A simulation of its optics, not a recording.</p>
+  <strong>What its cortex is given</strong>
+  <canvas id="povRF" width="512" height="288" aria-label="The frame shown to the mouse's visual cortex, with each recorded neuron placed where it looks"></canvas>
+  <p id="povCaption">The grey frame the digital twin is shown. Each dot is one of mouse 17797's recorded neurons, placed at the centre of its receptive field; bright means the model predicts it above its usual level for this map.</p>
+  <button type="button" id="povExit">Leave the mouse's view</button>
+</aside>
+<div class="loading" id="loading"><div><strong>Opening the room</strong><p id="loadText">Loading&hellip;</p></div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+<script src="./vendor/three.min.js"></script>
+<script src="./vendor/GLTFLoader.js"></script>
+<script src="./vendor/SkeletonUtils.js"></script>
+<script src="./vendor/fflate.js"></script>
 <script type="module">
 import { Encoder, choose, turnSeed, BRAIN_SEED, WINDOW_MS } from "./decide.js";
 
@@ -280,29 +198,137 @@ const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fmt = new Intl.NumberFormat("en-US");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const loadText = $("loadText");
-const TURNS = 120;
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Room for every animal that can play and one more. It was 6, and when the
+// zebrafish became the seventh player "Everyone who can play" quietly dropped
+// it off the end -- a cap must not decide who "everyone" is.
+  const HISTORY_LIMIT = 600, MAX_SEATS = 8, SHUFFLE_SEED = 783;
+const SEAT_COLORS = ["#F2B84B", "#6FB7AE", "#E07A8F", "#A58BE0", "#A8D46F", "#6FA8E0", "#E0A06F", "#C9D6DF"];
 
 // ---------------------------------------------------------------- workers
-function rpcWorker(url) {
-  const w = new Worker(url, { type: "module" });
+function rpcWorker(url, classic) {
+  const w = new Worker(url, classic ? {} : { type: "module" });
   let next = 1;
-  const waiting = new Map();
-  const listeners = [];
+  const waiting = new Map(), listeners = [], missed = [];
+  // A WORKER THAT IS READY BEFORE ANYBODY IS LISTENING. The game worker posts
+  // "ready" as soon as its module is up, which can be before the page has
+  // finished reading the roster and attached a listener -- and then the page
+  // waits for a message that already came and went. Adding the zebrafish's
+  // 4.6 MB brain.json to the roster read was enough to lose that race every
+  // time. Anything with no listener yet is kept and replayed to the first one.
   w.onmessage = (e) => {
     const m = e.data;
-    if (m.id && waiting.has(m.id)) { const { res, rej } = waiting.get(m.id); waiting.delete(m.id); m.error ? rej(new Error(m.error)) : res(m); }
-    else listeners.forEach((f) => f(m));
+    if (m.id && waiting.has(m.id)) { const { res, rej } = waiting.get(m.id); waiting.delete(m.id); m.error || m.type === "error" ? rej(new Error(m.error || m.message)) : res(m); }
+    else if (listeners.length) listeners.forEach((f) => f(m));
+    else missed.push(m);
   };
-  w.onerror = (e) => listeners.forEach((f) => f({ type: "error", message: e.message }));
+  w.onerror = (e) => { const err = new Error(e.message || "worker failed"); for (const { rej } of waiting.values()) rej(err); waiting.clear(); listeners.forEach((f) => f({ type: "error", message: err.message })); };
   return {
     call: (type, payload = {}, transfer = []) => new Promise((res, rej) => { const id = next++; waiting.set(id, { res, rej }); w.postMessage({ type, id, ...payload }, transfer); }),
-    on: (f) => listeners.push(f),
+    on: (f) => { listeners.push(f); while (missed.length) f(missed.shift()); },
     post: (m) => w.postMessage(m),
+    kill: () => w.terminate(),
   };
 }
 const game = rpcWorker("./game-worker.js");
-const brainW = rpcWorker("./brain-worker.js");
+
+// One worker per brain, kept between games: a fly is 91 MB to fetch and nobody
+// should download it twice because the viewer added a worm.
+const brains = new Map();
+// ?debug&fault=<species id> makes that brain fail to load, so the rule that a
+// faulted seat does not stop the stage can be tested by breaking it.
+const FORCE_FAULT = (() => { const q = new URLSearchParams(location.search); return q.has("debug") ? q.get("fault") : null; })();
+function brainFor(species, shuffled, onProgress, instance = "shared") {
+  if (FORCE_FAULT === species.id) return { w: null, loaded: Promise.reject(new Error("forced fault (?fault)")), key: "forced" };
+  const key = `${species.id}|${shuffled ? "shuffled" : "real"}${species.id === "mouse_v1" ? `|${instance}` : ""}`;
+  if (brains.has(key)) return brains.get(key);
+  if (species.id === "mouse_v1") {
+    const w = rpcWorker("./mouse-worker.js", true);
+    const loaded = new Promise((res, rej) => w.on((m) => {
+      if (m.type === "loaded") {
+        const meta = { ...m.meta, species: "mouse_v1", sensory: {}, senses: {}, motor: Array.from({ length: m.meta.n }, (_, i) => i), groups: visualActionGroups(m.meta.n),
+          provenance: { readout: "CONVENTION (not a source annotation): visual-cortex response cells are assigned deterministically to the 39 game actions; MICrONS contains no motor cortex." } };
+        res({ ...m, meta });
+      }
+      if (m.type === "error") rej(new Error(m.message));
+    }));
+    w.post({ type: "load", base: "./species/mouse_v1/" });
+    const entry = { w, loaded, key };
+    brains.set(key, entry); loaded.catch(() => brains.delete(key));
+    return entry;
+  }
+  const w = rpcWorker("./brain-worker.js");
+  const loaded = new Promise((res, rej) => w.on((m) => {
+    if (m.type === "progress" && m.total) onProgress && onProgress(m.got / m.total);
+    if (m.type === "loaded") res(m);
+    if (m.type === "error") rej(new Error(m.message));
+  }));
+  w.post({ type: "load", base: `./species/${species.id}/`, shuffleSeed: shuffled ? SHUFFLE_SEED : null });
+  const entry = { w, loaded, key };
+  brains.set(key, entry);
+  loaded.catch(() => brains.delete(key));
+  return entry;
+}
+function visualActionGroups(n) {
+  // Synthetic readout, not a claim about mouse motor neurons. Each recorded
+  // visual cell is assigned once to one of the game's 39 action groups.
+  let seed = 783;
+  const rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const ids = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  const groups = Object.fromEntries([["e", 12], ["p", 12], ["w", 8], ["n", 7]].map(([m, k]) => [m, Array.from({ length: k }, () => [])]));
+  const slots = Object.entries(groups).flatMap(([m, gs]) => gs.map((_, a) => [m, a]));
+  ids.forEach((id, i) => groups[slots[i % slots.length][0]][slots[i % slots.length][1]].push(id));
+  return groups;
+}
+
+// ---------------------------------------------------------------- the roster
+// data/roster.json is the one list; a species can take a seat when its row says
+// so AND its package is actually here. The page never offers what it cannot run.
+let roster = [];
+const available = new Map();   // id -> brain.json of a package that exists
+const label = (s) => `${s.name} · ${s.detail}`;
+const shortLabel = (s) => ({ drosophila_female: "Fly ♀", drosophila_male: "Fly ♂", drosophila_larva: "Fly larva", c_elegans_herm: "Worm ⚥", c_elegans_male: "Worm ♂", ciona_larva: "Sea squirt", zebrafish_larva: "Zebrafish", mouse_v1: "Mouse" }[s.id] || s.name);
+async function readRoster() {
+  roster = (await (await fetch("./roster.json")).json()).species;
+  await Promise.all(roster.map(async (s) => {
+    try {
+      const r = await fetch(`./species/${s.id}/brain.json`, { cache: "no-cache" });
+      if (r.ok && (r.headers.get("content-type") || "").includes("json")) available.set(s.id, await r.json());
+      else if (s.id === "mouse_v1") {
+        const m = await fetch(`./species/${s.id}/mouse.json`, { cache: "no-cache" });
+        if (m.ok && (m.headers.get("content-type") || "").includes("json")) available.set(s.id, await m.json());
+      }
+    } catch (_) { /* not packaged here */ }
+  }));
+  $("roster").innerHTML = roster.map((s) => {
+    const ok = available.has(s.id);
+    // A species that is here plays. One that is not says why -- and on the
+    // published site the usual reason is that its data may be used but not
+    // redistributed, so it has to be exported locally (tools/export_*.py).
+    // Not here, and not cleared to be served: that is the reason a visitor to
+    // the published page needs, not how to export it.
+    const held = !available.has(s.id) && s.redistribute !== true;
+    const why = held ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
+      : s.id === "mouse_v1" ? (available.has(s.id) ? "plays through a synthetic readout of visual-cortex activity; this dataset has no motor cortex" : "visual cortex model not packaged")
+      : s.blocker && available.has(s.id) ? (isWatcher(s) ? `watches from its tank; cannot act. ${s.blocker}` : s.blocker)
+      : ok ? `${fmt.format(available.get(s.id).n)} neurons`
+      : s.redistribute === false ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
+      : s.id === "zebrafish_larva" ? "needs a Fish1 export (a personal CAVE token)" : "not exported yet";
+    return `<div><b>${esc(label(s))}</b><span class="why${s.warning && ok ? " warn" : ""}">${esc(why)}${s.warning && ok ? " ⚠" : ""}</span></div>`;
+  }).join("");
+}
+// A species whose roster row names a blocker is shown, with the blocker, and not
+// offered: by PREREGISTRATION.md a seat whose senses reach no neuron never acts.
+// A blocker keeps a species off the stage -- unless it can still be WATCHED,
+// which is what the fish's blocker describes.
+const playable = () => roster.filter((s) => available.has(s.id) && (!s.blocker || isWatcher(s)));
+// A WATCHER takes a tank and a country and is shown the game, but gives no
+// orders, because nothing in it reaches a motor neuron. The zebrafish is one:
+// Fish1's axons are unproofread, so 62% of its cells have no edge at all. That
+// is the dataset's state today, not a fault in the mapping, and the exporter
+// re-tests it -- the fish seats itself when proofreading catches up.
+const isWatcher = (species) => species.seat === false;
 
 // ---------------------------------------------------------------- the room
 const canvas = $("stage");
@@ -315,49 +341,37 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0c1113);
-scene.fog = new THREE.Fog(0x0c1113, 5, 12);
-const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 60);
-scene.add(new THREE.HemisphereLight(0x9fb8c8, 0x1a1410, 0.55));
-const lamp = new THREE.PointLight(0xffb877, 1.8, 7, 2);
-lamp.position.set(0.95, 1.35, -0.75); lamp.castShadow = true; lamp.shadow.mapSize.set(1024, 1024);
-// Without a bias, a point light's cube shadow map shadows every surface onto itself:
-// the wall and floor came out covered in concentric rings (shadow acne).
-lamp.shadow.bias = -0.002; lamp.shadow.normalBias = 0.03; lamp.shadow.radius = 3;
-lamp.shadow.camera.near = 0.05; lamp.shadow.camera.far = 7;
-scene.add(lamp);
-const glowLight = new THREE.SpotLight(0xbcd6ff, 1.6, 4, Math.PI / 3, 0.8, 1.6);
-glowLight.position.set(0, 1.16, -0.8); glowLight.target.position.set(0, 1.0, 0.4);
-scene.add(glowLight, glowLight.target);
-const fill = new THREE.DirectionalLight(0x8aa5ff, 0.5);
-fill.position.set(-2, 3, 2);
-scene.add(fill);
+scene.fog = new THREE.Fog(0x0c1113, 9, 22);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 80);
+scene.add(new THREE.HemisphereLight(0x9fb8c8, 0x1a1410, 0.6));
+const fill = new THREE.DirectionalLight(0x8aa5ff, 0.45); fill.position.set(-3, 5, 4); scene.add(fill);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(60, 8), new THREE.MeshStandardMaterial({ color: 0x1b2226, roughness: 0.95 }));
+backWall.position.set(0, 4, -2.6); backWall.receiveShadow = true; scene.add(backWall);
 
-const VIEWS = {
-  shoulder: { pos: [1.15, 1.85, 1.35], look: [-0.35, 1.1, -0.5] },
-  screen: { pos: [0.3, 1.38, -0.36], look: [0.0, 1.15, -0.88] },
-  brain: { pos: [-0.45, 1.5, 0.55], look: [-1.15, 1.3, -0.35] },
-  world: { pos: [-0.35, 1.8, 1.45], look: [-0.45, 1.95, -1.66] },
-  wide: { pos: [2.1, 2.3, 2.4], look: [-0.4, 1.0, -0.4] },
-};
-let yaw = 0, pitch = 0, tween = null;
+const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...o });
+const mesh = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; };
+
+// ---------------------------------------------------------------- camera
+let VIEWS = {};
+let yaw = 0, pitch = 0, tween = null, activeView = "wide";
 const lookFrom = (pos, look) => { const d = new THREE.Vector3().subVectors(new THREE.Vector3(...look), new THREE.Vector3(...pos)).normalize(); return { yaw: Math.atan2(-d.x, -d.z), pitch: Math.asin(d.y) }; };
 const applyCamera = () => camera.rotation.set(pitch, yaw, 0, "YXZ");
-const pressView = (name) => document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
+const pressView = (name) => { activeView = name; document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name))); };
 function goTo(name, instant) {
-  const v = VIEWS[name], to = lookFrom(v.pos, v.look);
+  const v = VIEWS[name]; if (!v) return;
+  const to = lookFrom(v.pos, v.look);
   pressView(name);
   if (instant || reduceMotion) { camera.position.set(...v.pos); yaw = to.yaw; pitch = to.pitch; applyCamera(); tween = null; return; }
   let dy = to.yaw - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
   tween = { t: 0, p0: camera.position.clone(), p1: new THREE.Vector3(...v.pos), y0: yaw, y1: yaw + dy, q0: pitch, q1: to.pitch };
 }
-document.querySelectorAll(".views button").forEach((b) => b.addEventListener("click", () => goTo(b.dataset.view)));
-goTo("shoulder", true);
 const keys = new Set();
 addEventListener("keydown", (e) => { if (!e.target.closest("select, input")) keys.add(e.code); });
 addEventListener("keyup", (e) => keys.delete(e.code));
 addEventListener("blur", () => keys.clear());
-const pointers = new Map();
-let pinch = 0;
+const pointers = new Map(); let pinch = 0;
 canvas.addEventListener("pointerdown", (e) => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.focus(); });
 canvas.addEventListener("pointermove", (e) => {
   const p = pointers.get(e.pointerId); if (!p) return;
@@ -366,21 +380,18 @@ canvas.addEventListener("pointermove", (e) => {
   p.x = e.clientX; p.y = e.clientY;
 });
 const endPointer = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = 0; };
-canvas.addEventListener("pointerup", endPointer);
-canvas.addEventListener("pointercancel", endPointer);
-canvas.addEventListener("wheel", (e) => { e.preventDefault(); moveForward(-e.deltaY * 0.0015); }, { passive: false });
+canvas.addEventListener("pointerup", endPointer); canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("wheel", (e) => { e.preventDefault(); moveForward(-e.deltaY * 0.002); }, { passive: false });
 function moveForward(a) { camera.position.addScaledVector(new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation), a); tween = null; pressView(""); }
 
-// ---------------------------------------------------------------- maps: province rasters from the .odmap itself
-const SW = 1920, SH = 1080, MAPW = 1600, MAPH = 800, WW = 2048, WH = 1024;
-const screenCanvas = document.createElement("canvas"); screenCanvas.width = SW; screenCanvas.height = SH;
-const sc = screenCanvas.getContext("2d");
-const screenTex = new THREE.CanvasTexture(screenCanvas); screenTex.encoding = THREE.sRGBEncoding; screenTex.flipY = false; screenTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const mapCanvas = document.createElement("canvas"); mapCanvas.width = MAPW; mapCanvas.height = MAPH;
-const mc = mapCanvas.getContext("2d"); const mapImage = mc.createImageData(MAPW, MAPH);
+// ---------------------------------------------------------------- maps (Open Fly's, unchanged in what they compute)
+const MAPW = 800, MAPH = 400, WW = 2048, WH = 1024;
 const worldCanvas = document.createElement("canvas"); worldCanvas.width = WW; worldCanvas.height = WH;
 const wc = worldCanvas.getContext("2d"); const worldImage = wc.createImageData(WW, WH);
 const worldTex = new THREE.CanvasTexture(worldCanvas); worldTex.encoding = THREE.sRGBEncoding; worldTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const worldFrame = mesh(new THREE.BoxGeometry(4.3, 2.25, 0.04), std(0x14181b, { metalness: 0.4 }), 0, 3.35, -2.56);
+const worldPlane = new THREE.Mesh(new THREE.PlaneGeometry(4.16, 2.08), new THREE.MeshBasicMaterial({ map: worldTex, toneMapped: false }));
+worldPlane.position.set(0, 3.35, -2.535); scene.add(worldFrame, worldPlane);
 
 const mapCache = new Map();
 async function loadMap(path) {
@@ -392,8 +403,7 @@ async function loadMap(path) {
   const provinces = JSON.parse(dec.decode(files["provinces.json"]));
   const pngBlob = new Blob([files["provinces.png"]], { type: "image/png" });
   const full = await createImageBitmap(pngBlob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-  const srcW = full.width, srcH = full.height;
-  full.close();
+  const srcW = full.width, srcH = full.height; full.close();
   let maxPid = 0; const count = new Map();
   for (const [k, p] of Object.entries(provinces)) { maxPid = Math.max(maxPid, +k); count.set(p.country_id, (count.get(p.country_id) || 0) + 1); }
   const world = await rasterIds(pngBlob, 0, 0, srcW, srcH, WW, WH, maxPid);
@@ -414,7 +424,6 @@ async function rasterIds(blob, sx, sy, sw, sh, w, h, maxPid) {
   return ids;
 }
 async function seatCrop(map, cid) {
-  // The seat's own provinces, from the world raster, then the source PNG cut there at full resolution.
   let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
   const own = new Uint8Array(map.maxPid + 1);
   for (const [k, p] of Object.entries(map.provinces)) if (p.country_id === cid) own[+k] = 1;
@@ -427,14 +436,13 @@ async function seatCrop(map, cid) {
   const sx = Math.min(Math.max(cx - w / 2, 0), map.srcW - w), sy = Math.min(Math.max(cy - h / 2, 0), map.srcH - h);
   return rasterIds(map.pngBlob, sx, sy, w, h, MAPW, MAPH, map.maxPid);
 }
-
 const hexRGB = (h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 const hashRGB = (n) => { const h = (n * 2654435761) >>> 0; return [60 + (h & 127), 60 + ((h >> 8) & 127), 60 + ((h >> 16) & 127)]; };
 function b64bytes(s) { const raw = atob(s); const b = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) b[i] = raw.charCodeAt(i); return b; }
-function paintInto(ids, W, H, image, pos, seat) {
-  const ob = b64bytes(pos.owners);
-  const owners = new Uint16Array(ob.buffer, 0, ob.length >> 1);
-  const colors = new Map(Object.entries(pos.colors || {}).map(([cid, v]) => [+cid, hexRGB(v.hex)]));
+// `edge` maps a seat's cid to the colour its border is drawn in, so one world
+// shows every animal's country at once.
+function paintInto(ids, W, H, image, owners, colorHex, edge) {
+  const colors = new Map(Object.entries(colorHex || {}).map(([cid, v]) => [+cid, hexRGB(v.hex)]));
   const px = image.data;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, pid = ids[i], cid = pid < owners.length ? owners[pid] : 0;
@@ -442,352 +450,1170 @@ function paintInto(ids, W, H, image, pos, seat) {
     if (pid && cid) { const c = colors.get(cid) || hashRGB(cid); r = c[0]; g = c[1]; b = c[2]; }
     const rp = x + 1 < W ? ids[i + 1] : pid, dp = y + 1 < H ? ids[i + W] : pid;
     const cr = rp < owners.length ? owners[rp] : 0, cd = dp < owners.length ? owners[dp] : 0;
-    if (pid && (cr !== cid || cd !== cid)) { if (cid === seat || cr === seat || cd === seat) { r = 242; g = 184; b = 75; } else { r *= 0.45; g *= 0.45; b *= 0.45; } }
+    if (pid && (cr !== cid || cd !== cid)) {
+      const hit = edge.get(cid) || edge.get(cr) || edge.get(cd);
+      if (hit) { r = hit[0]; g = hit[1]; b = hit[2]; } else { r *= 0.45; g *= 0.45; b *= 0.45; }
+    }
     const o = i * 4; px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255;
   }
 }
 
-// ---------------------------------------------------------------- the monitor
-const S = 1.2, s = (v) => v * S, font = (w, size, fam) => `${w} ${s(size)}px ${fam}`;
-const G = { meta: null, turns: [], over: null, crop: null, map: null };
-function drawScreen() {
-  const t = G.turns[G.turns.length - 1], m = G.meta;
-  sc.fillStyle = "#0c0e14"; sc.fillRect(0, 0, SW, SH);
-  sc.fillStyle = "#161a24"; sc.fillRect(0, 0, SW, s(56));
-  sc.textBaseline = "top";
-  sc.fillStyle = "#F2B84B"; sc.font = font(600, 24, "Figtree, sans-serif"); sc.fillText("OPEN DOCTRINES", s(20), s(14));
-  sc.fillStyle = "#E6E8EE"; sc.font = font(500, 20, "Figtree, sans-serif");
-  sc.fillText(m ? `${m.mapName}  ·  ${m.name}  ·  Turn ${t ? t.pos.turn + 1 : 1} / ${TURNS}` : "Waiting for a game", s(290), s(16));
-  sc.fillStyle = "#8C92A0"; sc.textAlign = "right"; sc.fillText(m ? `Game ${m.game}  ·  seed ${m.seed}` : "", SW - s(20), s(16)); sc.textAlign = "left";
-  sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = "high";
-  sc.drawImage(mapCanvas, 0, s(56), s(1100), s(550));
-  sc.strokeStyle = "#323846"; sc.lineWidth = s(2); sc.strokeRect(0, s(56), s(1100), s(550));
+// ---------------------------------------------------------------- the animals, generated
+// Built from primitives rather than modelled, as docs/stage.md asks: a change to
+// the roster must not need an artist. Each returns { root, animate(t, drive) }
+// where drive (0..1) is how much the brain just did.
+// A PHASE THAT IS ACCUMULATED, NOT MULTIPLIED. The animals used sin(t * f)
+// with f following the brain's activity -- which decays every frame, so f
+// changed every frame, and d(t*f)/dt = f + t*df/dt: ten minutes in, a small
+// change of speed moved the phase hundreds of radians a second and every
+// animal jittered. A phaser adds f*dt each frame, so a change of speed changes
+// the speed and nothing else. The mouse's sniff was already written this way,
+// which is why it was the one animal that did not shake.
+function phaser() {
+  let phase = 0, last = null;
+  return (t, freq) => { if (last !== null) phase += Math.min(0.1, Math.max(0, t - last)) * freq; last = t; return phase; };
+}
+function stripedTexture(base, stripe, n, vertical) {
+  const cv = document.createElement("canvas"); cv.width = vertical ? 16 : 256; cv.height = vertical ? 256 : 16;
+  const c = cv.getContext("2d"); c.fillStyle = base; c.fillRect(0, 0, cv.width, cv.height); c.fillStyle = stripe;
+  for (let i = 0; i < n; i++) vertical ? c.fillRect(0, 22 + i * (220 / n), 16, 10) : c.fillRect(20 + i * (220 / n), 0, 9, 16);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+}
+function ellipsoid(rx, ry, rz, mat, seg = 24) { const m = mesh(new THREE.SphereGeometry(1, seg, Math.round(seg * 0.7)), mat); m.scale.set(rx, ry, rz); return m; }
+
+function makeFly(male) {
+  const root = new THREE.Group();
+  const cuticle = std(0x6b4a26, { roughness: 0.45 });
+  const thorax = ellipsoid(0.028, 0.026, 0.034, cuticle); thorax.position.set(0, 0.05, 0);
+  const abdMat = std(0xffffff, { roughness: 0.45, map: stripedTexture("#5a391a", male ? "#1a0f07" : "#140c06", male ? 4 : 7, true) });
+  const abdomen = ellipsoid(0.026, 0.024, male ? 0.036 : 0.046, abdMat); abdomen.position.set(0, 0.045, 0.058); abdomen.rotation.x = -0.25;
+  if (male) { const tip = ellipsoid(0.02, 0.018, 0.014, std(0x120a05)); tip.position.set(0, 0.035, 0.09); root.add(tip); }
+  const head = ellipsoid(0.022, 0.02, 0.018, cuticle); head.position.set(0, 0.062, -0.042);
+  const eyeMat = std(0x7a0806, { roughness: 0.32 });
+  for (const s of [-1, 1]) { const e = ellipsoid(0.012, 0.015, 0.012, eyeMat); e.position.set(s * 0.017, 0.066, -0.044); root.add(e); }
+  const wingMat = new THREE.MeshStandardMaterial({ color: 0xd8e4ea, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, roughness: 0.2 });
+  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), wingMat); w.scale.set(0.45, 1, 1); w.rotation.set(-Math.PI / 2 + 0.12, 0, s * 0.35); w.position.set(s * 0.022, 0.074, 0.045); root.add(w); }
+  const legMat = std(0x2a1c0e);
+  const legs = [];
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const pivot = new THREE.Group(); pivot.position.set(s * 0.02, 0.04, -0.02 + k * 0.022);
+    const leg = mesh(new THREE.CylinderGeometry(0.0025, 0.002, 0.07, 6), legMat, 0, -0.022, 0); leg.rotation.z = s * 0.9; leg.position.x = s * 0.022;
+    pivot.add(leg); root.add(pivot); if (k === 0) legs.push(pivot);
+  }
+  root.add(thorax, abdomen, head);
+  root.scale.setScalar(2.4);
+  return { root, animate(t, drive) {
+    legs.forEach((p, i) => { p.rotation.x = drive * 0.5 * Math.max(0, Math.sin(t * 14 + i * Math.PI)); });
+    head.rotation.y = Math.sin(t * 0.7) * 0.08;
+  } };
+}
+function makeLarva() {
+  const root = new THREE.Group(), segs = [];
+  const mat = std(0xf1ead8, { roughness: 0.35, transparent: true, opacity: 0.92 });
+  for (let i = 0; i < 12; i++) { const r = 0.016 * (1 - Math.abs(i - 6) / 12) + 0.006; const s = ellipsoid(r, r * 0.85, 0.014, mat, 16); s.position.set(0, r, -0.08 + i * 0.015); root.add(s); segs.push(s); }
+  const hook = ellipsoid(0.004, 0.004, 0.006, std(0x1b120a)); hook.position.set(0, 0.012, -0.093); root.add(hook);
+  root.scale.setScalar(2.2);
+  const ph = phaser();
+  return { root, animate(t, drive) { const p = ph(t, 5); segs.forEach((s, i) => { s.scale.z = 0.014 * (1 + (0.15 + drive * 0.4) * Math.sin(p - i * 0.6)); }); } };
+}
+// A tube whose centre line and radius are recomputed every frame: the worm's
+// whole body, the mouse's tail. `radius(u)` is the profile along the length,
+// u = 0 at the head. Rings are laid perpendicular to the path with "up" as
+// the other axis, which suits a body lying on a surface.
+function taperedTube(nSeg, nRad, radius, material, flatten = 1) {
+  const verts = (nSeg + 1) * nRad;
+  const pos = new Float32Array(verts * 3), idx = [];
+  for (let i = 0; i < nSeg; i++) for (let j = 0; j < nRad; j++) {
+    const a = i * nRad + j, b = i * nRad + (j + 1) % nRad, c = a + nRad, d = b + nRad;
+    idx.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setIndex(idx);
+  const m = new THREE.Mesh(geo, material); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+  const T = new THREE.Vector3(), S = new THREE.Vector3(), U = new THREE.Vector3(0, 1, 0);
+  // `at(u)` returns the centre line; the tube samples it nSeg + 1 times.
+  m.userData.update = (at) => {
+    const pts = []; for (let i = 0; i <= nSeg; i++) pts.push(at(i / nSeg));
+    for (let i = 0; i <= nSeg; i++) {
+      T.subVectors(pts[Math.min(nSeg, i + 1)], pts[Math.max(0, i - 1)]).normalize();
+      S.crossVectors(T, U).normalize();
+      const up = new THREE.Vector3().crossVectors(S, T).normalize();
+      const r = radius(i / nSeg);
+      for (let j = 0; j < nRad; j++) {
+        const th = (j / nRad) * Math.PI * 2, o = (i * nRad + j) * 3;
+        pos[o] = pts[i].x + r * (Math.cos(th) * S.x + Math.sin(th) * up.x * flatten);
+        pos[o + 1] = pts[i].y + r * (Math.cos(th) * S.y + Math.sin(th) * up.y * flatten);
+        pos[o + 2] = pts[i].z + r * (Math.cos(th) * S.z + Math.sin(th) * up.z * flatten);
+      }
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+  };
+  return m;
+}
+
+// C. ELEGANS, as it looks under a dissecting microscope: a translucent body
+// about fifteen times as long as it is wide, a rounded head, and -- visible
+// through the cuticle -- the two-bulbed pharynx, the dark granular intestine
+// and, in the hermaphrodite, eggs in the uterus either side of the vulva. The
+// hermaphrodite's tail is a fine whip; the male's is blunt and ends in the
+// fan (bursa) it mates with. It crawls on a bacterial lawn in a travelling
+// sine wave, head first, and leaves tracks, as worms on a plate do.
+function makeWorm(male) {
+  const root = new THREE.Group();
+  const L = 0.26, R = 0.0085;
+  // Radius along the body: a rounded nose, a long even middle, then either a
+  // fine whip (hermaphrodite) or a blunt end under the fan (male).
+  const radius = (u) => {
+    const nose = Math.sqrt(Math.min(1, u / 0.05));
+    const tail = male ? (u > 0.9 ? 0.55 + 0.45 * (1 - (u - 0.9) / 0.1) : 1) : (u > 0.78 ? Math.pow(1 - (u - 0.78) / 0.22, 1.4) : 1);
+    const mid = male ? 0.88 : 1 + 0.08 * Math.exp(-((u - 0.5) ** 2) / 0.01);
+    return Math.max(0.0004, R * nose * tail * mid);
+  };
+  const cuticle = new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.2, metalness: 0, transparent: true, opacity: 0.72, depthWrite: false });
+  const body = taperedTube(72, 14, radius, cuticle, 0.85);
+  const gut = taperedTube(48, 8, (u) => R * 0.45 * Math.sin(Math.PI * u) ** 0.4, std(0x4f4230, { roughness: 0.9 }), 0.85);
+  const pharynx = [0.045, 0.1].map((u, k) => ({ u, m: ellipsoid(R * (k ? 0.62 : 0.5), R * (k ? 0.58 : 0.46), R * (k ? 0.9 : 0.8), std(0xb8a58a, { roughness: 0.5 }), 12) }));
+  const isthmus = { u: 0.072, m: ellipsoid(R * 0.22, R * 0.22, R * 1.4, std(0xb8a58a), 8) };
+  const eggs = male ? [] : [0.36, 0.4, 0.44, 0.56, 0.6, 0.64].map((u) => ({ u, m: ellipsoid(R * 0.42, R * 0.36, R * 0.6, std(0xd9cfb0, { roughness: 0.6 }), 10) }));
+  const inner = [...pharynx, isthmus, ...eggs];
+  let fan = null;
+  if (male) {
+    fan = new THREE.Group();
+    const web = new THREE.Mesh(new THREE.CircleGeometry(R * 2.3, 20, -Math.PI * 0.55, Math.PI * 1.1), new THREE.MeshStandardMaterial({ color: 0xe9e4d6, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+    web.rotation.x = -Math.PI / 2; fan.add(web);
+    for (let k = 0; k < 9; k++) {   // the nine rays that stiffen each side of the fan
+      const a = -Math.PI * 0.5 + (k / 8) * Math.PI;
+      const ray = mesh(new THREE.CylinderGeometry(R * 0.07, R * 0.07, R * 2.2, 4), std(0xcfc6ad), Math.sin(a) * R * 1.1, 0, Math.cos(a) * R * 1.1);
+      ray.rotation.set(Math.PI / 2, 0, -a); fan.add(ray);
+    }
+    root.add(fan);
+  }
+  inner.forEach((o) => root.add(o.m));
+  root.add(gut, body);
+  let travelled = 0, lastT = 0;
+  const crawl = phaser();
+  const P = new THREE.Vector3(), Q = new THREE.Vector3();
+  return { root, animate(t, drive) {
+    // Forward along a circle round the lawn, the body bent by a wave that
+    // travels from head to tail; the brain's activity speeds the crawl.
+    const dt = Math.min(0.1, t - lastT); lastT = t;
+    travelled += dt * (0.012 + drive * 0.03);
+    const wave = crawl(t, 3 + drive * 6);
+    const Rc = 0.108, amp = 0.017, k = 2 * Math.PI * 1.5;
+    const at = (u) => {
+      const s = travelled - u * L, a = s / Rc;
+      const lat = amp * Math.sin(k * u - wave) * Math.min(1, u * 6);
+      return new THREE.Vector3(Math.cos(a) * (Rc + lat), R * 0.9, Math.sin(a) * (Rc + lat));
+    };
+    body.userData.update(at);
+    gut.userData.update((u) => at(0.13 + u * 0.72));
+    for (const o of inner) {
+      P.copy(at(o.u)); Q.copy(at(Math.min(1, o.u + 0.01)));
+      o.m.position.copy(P); o.m.lookAt(Q);
+    }
+    if (fan) { fan.position.copy(at(1)); fan.lookAt(at(0.97)); fan.rotateY(Math.PI); }
+  } };
+}
+function makeCiona() {
+  const root = new THREE.Group(), tail = [];
+  const mat = std(0xe9d9b8, { roughness: 0.3, transparent: true, opacity: 0.85 });
+  const trunk = ellipsoid(0.02, 0.018, 0.026, mat); trunk.position.set(0, 0.02, -0.04); root.add(trunk);
+  const ocellus = ellipsoid(0.004, 0.004, 0.004, std(0x1d140e)); ocellus.position.set(0.004, 0.03, -0.045); root.add(ocellus);
+  for (let i = 0; i < 20; i++) { const r = 0.006 * (1 - i / 24); const b = ellipsoid(r, r * 0.6, r, mat, 10); root.add(b); tail.push(b); }
+  root.scale.setScalar(2.6);
+  const ph = phaser();
+  return { root, animate(t, drive) { const p = ph(t, 4 + drive * 10); tail.forEach((b, i) => { const u = i / 19; b.position.set(0.02 * u * Math.sin(u * 4 - p), 0.02, -0.015 + u * 0.1); }); } };
+}
+function makeFish() {
+  const root = new THREE.Group(), body = [];
+  const mat = std(0xd9d2c0, { roughness: 0.25, transparent: true, opacity: 0.7 });
+  const stripeMat = std(0x1f1a17, { roughness: 0.6 });
+  for (let i = 0; i < 14; i++) { const u = i / 13; const r = 0.03 * (1 - u * 0.8) * (u < 0.15 ? 0.7 + u * 2 : 1); const s = ellipsoid(r * 0.7, r, 0.02, mat, 14); root.add(s); body.push({ s, u }); }
+  const stripe = [];
+  for (let i = 2; i < 13; i += 2) { const d = ellipsoid(0.004, 0.003, 0.008, stripeMat, 8); root.add(d); stripe.push({ d, u: i / 13 }); }
+  const yolk = ellipsoid(0.018, 0.016, 0.022, std(0xe5c88a, { transparent: true, opacity: 0.8 })); root.add(yolk);
+  const eyes = [-1, 1].map((s) => { const e = ellipsoid(0.013, 0.013, 0.011, std(0x0c0c10, { roughness: 0.15, metalness: 0.3 })); root.add(e); return { e, s }; });
+  const fin = new THREE.Mesh(new THREE.CircleGeometry(0.03, 20), new THREE.MeshStandardMaterial({ color: 0xe8e4da, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })); fin.scale.set(0.3, 1, 1); root.add(fin);
+  root.scale.setScalar(2.6);
+  const swim = phaser();
+  return { root, animate(t, drive) {
+    const p = swim(t, 6 + drive * 18), a = 0.012 + drive * 0.02;
+    const wave = (u) => a * u * u * Math.sin(u * 5 - p);
+    body.forEach(({ s, u }) => s.position.set(wave(u), 0, -0.07 + u * 0.19));
+    stripe.forEach(({ d, u }) => d.position.set(wave(u), 0.022 * (1 - u * 0.7), -0.07 + u * 0.19));
+    yolk.position.set(wave(0.2), -0.016, -0.03);
+    eyes.forEach(({ e, s }) => e.position.set(s * 0.02, 0.006, -0.06));
+    fin.position.set(wave(1), 0, 0.125); fin.rotation.y = Math.PI / 2 + wave(1) * 10;
+  } };
+}
+// A HOUSE MOUSE, sitting up in front of its screen, which is the posture in
+// which the MICrONS mouse watched its stimuli (head-fixed, on a treadmill --
+// the station gives it the desk instead). Agouti back, pale belly, ears half
+// the size of its head and lined pink, whiskers, and a tail as long as its
+// body lying out behind it. It sniffs and whisks all the time, and faster
+// when its cortex's predicted response to the map is high.
+function makeMouse() {
+  const root = new THREE.Group();
+  // Fur coloured by facing: darker along the back, pale underneath, per vertex.
+  const furred = (geo) => {
+    const n = geo.attributes.normal, c = new Float32Array(n.count * 3);
+    for (let i = 0; i < n.count; i++) {
+      // Agouti brown on top, grading to a pale belly. Read from the normal in
+      // the POSED geometry: a lathe's own "up" is its axis -- the spine --
+      // so colouring before the pose painted the mouse front-to-back.
+      const up = n.getY(i), w = Math.max(0, Math.min(1, 0.45 + up * 0.8));
+      c[i * 3] = 0.74 + (0.24 - 0.74) * w; c[i * 3 + 1] = 0.69 + (0.18 - 0.69) * w; c[i * 3 + 2] = 0.62 + (0.12 - 0.62) * w;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
+    return geo;
+  };
+  const fur = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const skin = std(0xe3a6a0, { roughness: 0.6 });
+  // The pose goes into the geometry before the fur is coloured (see furred).
+  const lathe = (profile, tilt, seg = 28) => {
+    const g = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+    g.rotateX(tilt); g.computeVertexNormals();
+    return furred(g);
+  };
+  // Body: a pear, widest over the haunches, lathed about its own axis and laid
+  // along -z (towards the screen), tipped up at the front as a mouse sits.
+  const body = new THREE.Mesh(lathe([[0.001, 0], [0.03, 0.006], [0.046, 0.025], [0.05, 0.05], [0.045, 0.075], [0.036, 0.1], [0.028, 0.118], [0.02, 0.128]], -Math.PI / 2 + 0.45), fur);
+  body.position.set(0, 0.04, 0.06); body.castShadow = true;
+  const neck = new THREE.Group(); neck.position.set(0, 0.095, -0.03); root.add(neck);
+  // Head: a cone rounded at both ends, the snout pointing at the screen.
+  const head = new THREE.Mesh(lathe([[0.024, 0], [0.028, 0.012], [0.026, 0.028], [0.018, 0.045], [0.009, 0.058], [0.004, 0.064], [0.001, 0.066]], -Math.PI / 2 - 0.12), fur);
+  head.castShadow = true; neck.add(head);
+  const nose = ellipsoid(0.0055, 0.0045, 0.005, std(0xd98a86, { roughness: 0.4 })); nose.position.set(0, -0.006, -0.066); neck.add(nose);
+  const ears = [];
+  for (const sd of [-1, 1]) {
+    const eye = ellipsoid(0.0065, 0.0065, 0.006, std(0x050506, { roughness: 0.05, metalness: 0.2 }));
+    eye.position.set(sd * 0.0165, 0.012, -0.03); neck.add(eye);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0016, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    glint.position.set(sd * 0.0155, 0.0155, -0.0355); neck.add(glint);
+    const ear = new THREE.Group(); ear.position.set(sd * 0.02, 0.022, -0.008);
+    const outer = new THREE.Mesh(new THREE.CircleGeometry(0.019, 24), new THREE.MeshStandardMaterial({ color: 0x6e5a48, roughness: 0.95, side: THREE.DoubleSide }));
+    const lining = new THREE.Mesh(new THREE.CircleGeometry(0.015, 24), new THREE.MeshStandardMaterial({ color: 0xe8aca6, roughness: 0.7, side: THREE.DoubleSide }));
+    lining.position.z = -0.0012; outer.scale.set(1, 1.1, 1); lining.scale.set(1, 1.1, 1);
+    ear.add(outer, lining); ear.rotation.set(0.15, sd * 0.55, sd * 0.35); ear.position.y += 0.012;
+    neck.add(ear); ears.push({ ear, sd });
+  }
+  // Whiskers: six a side, fanning back from the snout.
+  const wpos = [];
+  for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) {
+    const y = -0.004 + (k % 3) * 0.003, a = -0.35 + (k / 5) * 0.7, len = 0.045 + (k % 2) * 0.015;
+    wpos.push(sd * 0.006, y, -0.058, sd * (0.006 + Math.cos(a) * len), y + Math.sin(a) * len * 0.35, -0.058 + Math.sin(Math.abs(a)) * len * 0.5 + 0.01);
+  }
+  const whiskerGeo = new THREE.BufferGeometry(); whiskerGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(wpos), 3));
+  const whiskers = new THREE.LineSegments(whiskerGeo, new THREE.LineBasicMaterial({ color: 0xd8d2c8, transparent: true, opacity: 0.75 }));
+  const whiskerPivot = new THREE.Group(); whiskerPivot.add(whiskers); neck.add(whiskerPivot);
+  // Paws and haunches.
+  for (const sd of [-1, 1]) {
+    const fore = ellipsoid(0.006, 0.004, 0.009, skin); fore.position.set(sd * 0.014, 0.005, -0.012); root.add(fore);
+    const hind = ellipsoid(0.008, 0.004, 0.02, skin); hind.position.set(sd * 0.026, 0.004, 0.052); root.add(hind);
+    const hg = new THREE.SphereGeometry(0.02, 18, 14); hg.scale(0.75, 1, 1.2); hg.computeVertexNormals();
+    const haunch = new THREE.Mesh(furred(hg), fur); haunch.position.set(sd * 0.024, 0.028, 0.04); haunch.castShadow = true; root.add(haunch);
+  }
+  // Tail: as long as the body, tapering, lying out behind and curling a little.
+  const tail = taperedTube(40, 8, (u) => 0.0052 * (1 - u * 0.8), std(0xcf9f98, { roughness: 0.7 }));
+  root.add(body, tail);
+  root.scale.setScalar(1.25);
+  let sniff = 0, lastT = 0;
+  return { root, animate(t, drive) {
+    const dt = Math.min(0.1, t - lastT); lastT = t;
+    sniff += dt * (7 + drive * 7);                   // whisking, 7-14 Hz
+    whiskerPivot.rotation.y = Math.sin(sniff * 2 * Math.PI * 0.12) * 0.12;
+    whiskerPivot.rotation.x = Math.sin(sniff * 2 * Math.PI * 0.12 + 1) * 0.04;
+    nose.position.y = -0.006 + Math.sin(sniff * 2 * Math.PI * 0.12) * 0.0012;
+    neck.rotation.y = Math.sin(t * 0.35) * 0.18 + Math.sin(t * 1.3) * 0.04;
+    neck.rotation.x = Math.sin(t * 0.5) * 0.06;
+    body.scale.set(1 + Math.sin(t * 5.5) * 0.012, 1, 1 + Math.sin(t * 5.5) * 0.012);   // breathing
+    ears.forEach(({ ear, sd }, i) => { const flick = Math.max(0, Math.sin(t * 0.7 + i * 2.1)) ** 12; ear.rotation.y = sd * (0.55 + flick * 0.35); });
+    // From the base of the spine, down to the desk and out behind.
+    tail.userData.update((u) => new THREE.Vector3(
+      Math.sin(u * 2.4 + t * 0.6) * 0.02 * u + u * 0.07,
+      0.004 + Math.max(0, 0.12 - u) * 0.14,
+      0.062 + u * 0.16 - Math.sin(u * 3) * 0.03));
+  } };
+}
+// ---------------------------------------------------------------- modelled animals
+// web/models/<id>.glb, made in Blender by scene/*.py (docs/models.md is the
+// contract). Loaded once; each station gets its own clone -- SkeletonUtils,
+// because a plain clone of a skinned mesh shares one skeleton between two
+// animals and the second one would move the first. A species with no model
+// file keeps the generated placeholder below.
+const MODELS = new Map();
+async function loadModels(ids) {
+  const loader = new THREE.GLTFLoader();
+  await Promise.all(ids.map(async (id) => {
+    try {
+      // Loaded directly, no HEAD probe (see packed.js): a missing or wrong file
+      // throws here and the species keeps its generated placeholder.
+      const gltf = await new Promise((res, rej) => loader.load(`./models/${id}.glb`, res, undefined, rej));
+      MODELS.set(id, gltf.scene);
+    } catch (e) { console.warn(`model ${id}:`, e.message || e); }
+  }));
+}
+// Bend a chain of bones in world terms whatever roll Blender gave them: the
+// axis each bone turns about is the world's up (or side) direction expressed in
+// that bone's own frame at rest, measured once at load.
+function chainOf(root, prefix) {
+  // BONES ONLY, AND BY THEIR NAME PLUS WHATEVER THE LOADER ADDED. three.js's
+  // GLTFLoader keeps names unique by suffixing a repeat -- the sea squirt's
+  // "tail_2" arrived as "tail_2_1" -- and a lookup by exact name stopped the
+  // chain there, so 2 of its 12 tail bones moved. A gap is an error, not an end.
+  const re = new RegExp(`^${prefix}(\\d+)(?:_\\d+)?$`), found = new Map();
+  root.traverse((o) => { if (o.isBone) { const m = o.name.match(re); if (m && !found.has(+m[1])) found.set(+m[1], o); } });
+  const out = [];
+  for (let i = 0; found.has(i); i++) out.push(found.get(i));
+  if (out.length !== found.size) console.warn(`${prefix}*: bones ${[...found.keys()].sort((a, b) => a - b).join(",")} are not one unbroken chain`);
+  root.updateMatrixWorld(true);
+  const up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3(1, 0, 0), q = new THREE.Quaternion();
+  return out.map((b) => {
+    b.getWorldQuaternion(q); const inv = q.clone().invert();
+    return { b, rest: b.quaternion.clone(), yaw: up.clone().applyQuaternion(inv).normalize(), pitch: side.clone().applyQuaternion(inv).normalize() };
+  });
+}
+const tmpQ = new THREE.Quaternion();
+function bend(link, yaw, pitch = 0) {
+  link.b.quaternion.copy(link.rest);
+  if (yaw) link.b.quaternion.multiply(tmpQ.setFromAxisAngle(link.yaw, yaw));
+  if (pitch) link.b.quaternion.multiply(tmpQ.setFromAxisAngle(link.pitch, pitch));
+}
+function restOf(o) { return o ? { o, q: o.quaternion.clone(), p: o.position.clone() } : null; }
+function turn(r, x = 0, y = 0, z = 0) { if (!r) return; r.o.quaternion.copy(r.q).multiply(tmpQ.setFromEuler(new THREE.Euler(x, y, z))); }
+
+function modelled(id) {
+  const src = MODELS.get(id); if (!src) return null;
+  const model = THREE.SkeletonUtils.clone(src);
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+    // THE WORM'S SKIN, tuned for this room. Exported at 33% opacity it is
+    // right on Blender's grey backdrop and invisible on a plate under a desk
+    // lamp: the organs float with no body round them. Cloned first, so two
+    // worms do not share -- and double-apply -- one material.
+    if (o.material && o.material.name === "cuticle") {
+      o.material = o.material.clone();
+      o.material.opacity = 0.58; o.material.color.set(0xb4b1a4); o.material.roughness = 0.22;
+      o.renderOrder = 2;
+    }
+  });
+  const root = new THREE.Group(); root.add(model);
+  // By name, or by the name the loader gave it when it kept names unique.
+  const N = (n) => {
+    let hit = model.getObjectByName(n);
+    if (!hit) { const re = new RegExp(`^${n}_\\d+$`); model.traverse((o) => { if (!hit && re.test(o.name)) hit = o; }); }
+    if (!hit) console.warn(`${id}: no part named ${n}`);
+    return restOf(hit);
+  };
+  let lastT = 0, travelled = 0, sniff = 0;
+  if (id.startsWith("drosophila_") && id !== "drosophila_larva") {
+    const head = N("head"), legs = [N("leg_front_L"), N("leg_front_R")], wings = [N("wing_L"), N("wing_R")];
+    return { root, animate(t, drive) {
+      legs.forEach((l, i) => turn(l, drive * 0.45 * Math.max(0, Math.sin(t * 14 + i * Math.PI))));
+      turn(head, 0, Math.sin(t * 0.7) * 0.1, 0);
+      wings.forEach((w, i) => turn(w, 0, 0, (i ? -1 : 1) * Math.max(0, Math.sin(t * 0.9)) ** 20 * 0.15));
+    } };
+  }
+  if (id === "drosophila_larva") {
+    const spine = chainOf(model, "spine_"), peri = phaser();
+    return { root, animate(t, drive) {
+      // Peristalsis: a contraction running tail to head, and the head sweeping.
+      const p = peri(t, 3 + drive * 5);
+      spine.forEach((l, i) => bend(l, i < 3 ? Math.sin(t * 1.1) * 0.12 : 0, Math.sin(p + i * 0.7) * 0.05));
+    } };
+  }
+  if (id.startsWith("c_elegans")) {
+    // Crawls round the lawn: a pivot at the dish centre carries it forward,
+    // the bones carry the wave from nose to tail.
+    const spine = chainOf(model, "spine_"), pivot = new THREE.Group(), crawl = phaser();
+    root.remove(model); pivot.add(model); root.add(pivot);
+    model.position.set(0.105, 0, 0); model.rotation.y = 0;   // tangent to the circle, facing -Z
+    return { root, animate(t, drive) {
+      const dt = Math.min(0.1, t - lastT); lastT = t; travelled += dt * (0.1 + drive * 0.25);
+      pivot.rotation.y = travelled;
+      // The chain hangs from the nose, so bends add up towards the tail. With
+      // the raw sine the body's overall heading drifted and the worm swung
+      // off its plate; taking out the mean keeps the wave travelling along a
+      // body that goes where the worm is going.
+      const w = crawl(t, 3 + drive * 6);
+      const ang = spine.map((_, i) => 0.13 * Math.sin(i * 0.4 - w));
+      const mean = ang.reduce((a, b) => a + b, 0) / (ang.length || 1);
+      spine.forEach((l, i) => bend(l, ang[i] - mean));
+    } };
+  }
+  if (id === "ciona_larva") {
+    const tail = chainOf(model, "tail_");
+    const beat = phaser();
+    return { root, animate(t, drive) { const p = beat(t, 4 + drive * 10); tail.forEach((l, i) => bend(l, (0.05 + i * 0.012) * Math.sin(i * 0.5 - p))); } };
+  }
+  if (id === "zebrafish_larva") {
+    const spine = chainOf(model, "spine_"), eyes = [N("eye_L"), N("eye_R")], swim = phaser();
+    return { root, animate(t, drive) {
+      const p = swim(t, 5 + drive * 16), a = 0.03 + drive * 0.05;
+      spine.forEach((l, i) => bend(l, a * (0.3 + i / spine.length) * Math.sin(i * 0.55 - p)));
+      const sac = Math.round(Math.sin(t * 0.4) * 2) * 0.08;   // saccades: steps, not drift
+      eyes.forEach((e) => turn(e, 0, sac, 0));
+      // The bob moves the model INSIDE the root: the station puts the root in
+      // the middle of the water, and setting root.position.y here dropped the
+      // fish onto the floor under its tank.
+      model.position.y = Math.sin(t * 0.8) * 0.01;
+    } };
+  }
+  if (id === "mouse_v1") {
+    const head = N("head"), nose = N("nose"), wl = N("whiskers_L"), wr = N("whiskers_R"), el = N("ear_L"), er = N("ear_R"), tail = chainOf(model, "tail_");
+    return { root, animate(t, drive) {
+      const dt = Math.min(0.1, t - lastT); lastT = t; sniff += dt * (7 + drive * 7);
+      const whisk = Math.sin(sniff * 2 * Math.PI * 0.12);
+      turn(wl, 0, whisk * 0.18, 0); turn(wr, 0, -whisk * 0.18, 0);
+      if (nose) { nose.o.position.copy(nose.p); nose.o.position.y += whisk * 0.0012; }
+      turn(head, Math.sin(t * 0.5) * 0.06, Math.sin(t * 0.35) * 0.18 + Math.sin(t * 1.3) * 0.04, 0);
+      [el, er].forEach((e, i) => turn(e, 0, (i ? -1 : 1) * Math.max(0, Math.sin(t * 0.7 + i * 2.1)) ** 12 * 0.35, 0));
+      tail.forEach((l, i) => bend(l, Math.sin(t * 0.6 + i * 0.4) * 0.05));
+    } };
+  }
+  return { root, animate() {} };
+}
+
+const ANIMALS = { drosophila_female: () => makeFly(false), drosophila_male: () => makeFly(true), drosophila_larva: makeLarva, c_elegans_herm: () => makeWorm(false), c_elegans_male: () => makeWorm(true), ciona_larva: makeCiona, zebrafish_larva: makeFish, mouse_v1: makeMouse };
+const HOUSING = { drosophila_female: "keyboard", drosophila_male: "keyboard", drosophila_larva: "dish", c_elegans_herm: "dish", c_elegans_male: "dish", ciona_larva: "dish", zebrafish_larva: "tank", mouse_v1: "desk" };
+
+// ---------------------------------------------------------------- a brain beside each animal
+const BRAIN_SHAPE = { c_elegans_herm: [1, 0.18, 0.18], c_elegans_male: [1, 0.18, 0.18], ciona_larva: [1, 0.3, 0.3], drosophila_larva: [0.8, 0.5, 0.5], zebrafish_larva: [1, 0.45, 0.4] };
+function brainPoints(meta, positionsBuf) {
+  const n = meta.n;
+  let xyz, kind;
+  if (positionsBuf) {
+    const dv = new DataView(positionsBuf); const m = dv.getUint32(8, true);
+    if (m !== n) throw new Error("positions.bin does not match brain.json");
+    xyz = new Float32Array(positionsBuf.slice(16, 16 + n * 12)); kind = new Uint8Array(positionsBuf.slice(16 + n * 12, 16 + n * 13));
+  } else {
+    // LAYOUT, NOT ANATOMY: a species with no exported soma positions is drawn
+    // by role, senses in front and motor neurons behind, and the page says so.
+    const shape = BRAIN_SHAPE[meta.species] || [0.8, 0.55, 0.5];
+    kind = new Uint8Array(n).fill(2);
+    for (const idx of Object.values(meta.sensory)) for (const i of idx) kind[i] = 3;
+    for (const i of motorOf(meta)) kind[i] = 4;
+    xyz = new Float32Array(n * 3);
+    let a = 12345;
+    const r = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
+    for (let i = 0; i < n; i++) {
+      let x, y, z; do { x = r() * 2 - 1; y = r() * 2 - 1; z = r() * 2 - 1; } while (x * x + y * y + z * z > 1);
+      if (kind[i] === 3) x = 0.55 + Math.abs(x) * 0.45; else if (kind[i] === 4) x = -0.55 - Math.abs(x) * 0.45; else x *= 0.8;
+      xyz[i * 3] = x * shape[0]; xyz[i * 3 + 1] = y * shape[1]; xyz[i * 3 + 2] = z * shape[2];
+    }
+  }
+  // Fit to the pedestal whatever the source's units were.
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) { if (kind[i] === 255) continue; for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], xyz[i * 3 + k]); hi[k] = Math.max(hi[k], xyz[i * 3 + k]); } }
+  const c = lo.map((l, k) => (l + hi[k]) / 2), span = Math.max(...hi.map((h, k) => h - lo[k])) || 1;
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) xyz[i * 3 + k] = ((xyz[i * 3 + k] - c[k]) / span) * 0.5;
+  return { xyz, kind, fromData: !!positionsBuf };
+}
+const motorOf = (meta) => meta.motor || meta.dn || [];
+function buildBrainView(meta, pts, color) {
+  const n = meta.n, geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pts.xyz, 3));
+  const kind = new Float32Array(n); for (let i = 0; i < n; i++) kind[i] = pts.kind[i];
+  geo.setAttribute("aKind", new THREE.BufferAttribute(kind, 1));
+  const activity = new Float32Array(n), actAttr = new THREE.BufferAttribute(activity, 1); actAttr.setUsage(THREE.DynamicDrawUsage); geo.setAttribute("aAct", actAttr);
+  // Small brains get bigger points, so 177 neurons read as a brain and not as dust.
+  const size = n < 1000 ? 9 : n < 10000 ? 4 : 1.6;
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uScale: { value: 1 }, uPixel: { value: renderer.getPixelRatio() }, uSize: { value: size }, uSeat: { value: new THREE.Color(color) } },
+    vertexShader: `attribute float aKind; attribute float aAct; uniform float uScale; uniform float uPixel; uniform float uSize; uniform vec3 uSeat; varying vec3 vColor; varying float vAlpha;
+      void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); float hide = step(254.5, aKind);
+        vec3 base = vec3(0.30, 0.62, 0.58); float a = 0.12;
+        if (abs(aKind - 1.0) < 0.5) { base = vec3(0.30, 0.48, 0.58); a = 0.07; }
+        if (abs(aKind - 3.0) < 0.5) { base = vec3(0.50, 0.82, 0.68); a = 0.2; }
+        if (abs(aKind - 4.0) < 0.5) { base = uSeat; a = 0.8; }
+        vColor = mix(base, vec3(1.0, 0.95, 0.80), clamp(aAct, 0.0, 1.0)); vAlpha = (a + aAct * 0.95) * (1.0 - hide);
+        float s = (aKind > 3.5 && aKind < 4.5 ? uSize * 1.6 : uSize) + aAct * 5.0; gl_PointSize = s * uPixel * uScale / max(0.05, -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec3 vColor; varying float vAlpha; void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d); if (r > 0.25) discard; gl_FragColor = vec4(vColor, vAlpha * smoothstep(0.25, 0.0, r)); }`,
+  });
+  const points = new THREE.Points(geo, mat); points.frustumCulled = false;
+  const holder = new THREE.Group(); holder.add(points);
+  return { holder, mat, activity, actAttr };
+}
+
+// ---------------------------------------------------------------- stations
+// One per seat, in a row facing the world on the back wall. Each has its own
+// monitor showing that animal's country, and its brain on a pedestal beside it.
+const SPACING = 2.7;
+let stations = [];
+const stationRoot = new THREE.Group(); scene.add(stationRoot);
+function makeNameplate(text, sub, color) {
+  const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128; const c = cv.getContext("2d");
+  c.fillStyle = "#0f1416"; c.fillRect(0, 0, 512, 128); c.fillStyle = color; c.fillRect(0, 0, 10, 128);
+  c.fillStyle = "#EDE6D6"; c.font = "600 44px Figtree, sans-serif"; c.textBaseline = "top"; c.fillText(text, 30, 16);
+  c.fillStyle = "#8F9A97"; c.font = "500 28px Figtree, sans-serif"; c.fillText(sub, 30, 74);
+  const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.15), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  return { m, cv, c, tex };
+}
+function buildStation(seat, i, n) {
+  const g = new THREE.Group(); g.position.set((i - (n - 1) / 2) * SPACING, 0, 0);
+  const housing = HOUSING[seat.species.id] || "desk";
+  const wood = std(0x3a2a1c, { roughness: 0.7 }), metal = std(0x1a2024, { roughness: 0.4, metalness: 0.6 });
+  const deskTop = housing === "tank" ? 0.72 : 0.75;
+  if (housing === "tank") {
+    g.add(mesh(new THREE.BoxGeometry(1.5, deskTop, 0.75), metal, 0, deskTop / 2, 0));
+  } else {
+    g.add(mesh(new THREE.BoxGeometry(1.7, 0.05, 0.85), wood, 0, deskTop - 0.025, 0));
+    for (const [x, z] of [[-0.78, -0.35], [0.78, -0.35], [-0.78, 0.35], [0.78, 0.35]]) g.add(mesh(new THREE.BoxGeometry(0.05, deskTop - 0.05, 0.05), metal, x, (deskTop - 0.05) / 2, z));
+  }
+  // The monitor: that seat's own game, drawn every turn.
+  const scv = document.createElement("canvas"); scv.width = 1280; scv.height = 720;
+  const stex = new THREE.CanvasTexture(scv); stex.encoding = THREE.sRGBEncoding; stex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), new THREE.MeshBasicMaterial({ map: stex, toneMapped: false }));
+  const animal = modelled(seat.species.id) || (ANIMALS[seat.species.id] ? ANIMALS[seat.species.id]() : makeFly(false));
+  const lamp = new THREE.PointLight(0xffb877, 0.9, 3, 2);
+  if (housing === "tank") {
+    // A tank with a screen on the glass, which is the fish's whole station.
+    const glass = new THREE.MeshStandardMaterial({ color: 0xa8d8e0, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide });
+    const tank = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.62, 0.55), glass); tank.position.set(0, deskTop + 0.31, 0); g.add(tank);
+    const water = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.54, 0.53), new THREE.MeshStandardMaterial({ color: 0x2d6e7a, transparent: true, opacity: 0.18, depthWrite: false }));
+    water.position.set(0, deskTop + 0.27, 0); g.add(water);
+    g.add(mesh(new THREE.BoxGeometry(1.2, 0.03, 0.55), std(0xcfbf9a, { roughness: 1 }), 0, deskTop + 0.015, 0));
+    screen.scale.setScalar(0.62); screen.position.set(0, deskTop + 0.32, -0.26); g.add(screen);
+    animal.root.position.set(0, deskTop + 0.3, 0.02); animal.root.rotation.y = 0;
+    const tankLight = new THREE.PointLight(0x9fe0ff, 0.8, 2, 2); tankLight.position.set(0, deskTop + 0.75, 0.1); g.add(tankLight);
+  } else {
+    g.add(mesh(new THREE.BoxGeometry(0.84, 0.49, 0.04), metal, 0, deskTop + 0.42, -0.3));
+    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 10), metal, 0, deskTop + 0.1, -0.3));
+    g.add(mesh(new THREE.BoxGeometry(0.28, 0.015, 0.16), metal, 0, deskTop + 0.008, -0.3));
+    screen.position.set(0, deskTop + 0.42, -0.277); g.add(screen);
+    if (housing === "keyboard") {
+      g.add(mesh(new THREE.BoxGeometry(0.46, 0.022, 0.15), std(0x202428), 0, deskTop + 0.011, 0.02));
+      animal.root.position.set(0, deskTop + 0.022, 0.03);
+    } else if (housing === "dish") {
+      const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.025, 48, 1, true), new THREE.MeshStandardMaterial({ color: 0xcfe6ea, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+      dish.position.set(0, deskTop + 0.0125, 0.05); g.add(dish);
+      const sea = seat.species.id === "ciona_larva", food = seat.species.id === "drosophila_larva";
+      if (sea) {
+        // Sea water in a glass dish: the tadpole swims, it does not crawl.
+        const water = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.022, 48), new THREE.MeshStandardMaterial({ color: 0x2f6f82, roughness: 0.1, transparent: true, opacity: 0.35, depthWrite: false }));
+        water.position.set(0, deskTop + 0.011, 0.05); g.add(water);
+        g.add(mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.002, 48), std(0x1d3a44, { roughness: 0.6 }), 0, deskTop + 0.001, 0.05));
+      } else if (food) {
+        // A LARVA LIVES IN ITS FOOD. On the keyboard the 0.31 m maggot lay
+        // across a 0.15 m-deep keyboard with both ends in the air. Here it gets
+        // what a lab larva crawls in: cornmeal-molasses fly food, with the
+        // grooves larvae dig and a few flecks of yeast.
+        const cv = document.createElement("canvas"); cv.width = cv.height = 256; const c = cv.getContext("2d");
+        c.fillStyle = "#b8903e"; c.fillRect(0, 0, 256, 256);
+        let a = 7; const r = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
+        for (let k = 0; k < 900; k++) { c.fillStyle = r() < 0.5 ? "rgba(90,60,20,0.25)" : "rgba(235,205,130,0.3)"; c.fillRect(r() * 256, r() * 256, 1 + r() * 3, 1 + r() * 3); }
+        c.strokeStyle = "rgba(80,55,20,0.35)"; c.lineWidth = 2;
+        for (let k = 0; k < 14; k++) { c.beginPath(); let x = r() * 256, y = r() * 256; c.moveTo(x, y); for (let j = 0; j < 8; j++) { x += (r() - 0.5) * 40; y += (r() - 0.5) * 40; c.lineTo(x, y); } c.stroke(); }
+        c.fillStyle = "rgba(245,240,225,0.8)"; for (let k = 0; k < 40; k++) { c.beginPath(); c.arc(r() * 256, r() * 256, 1 + r() * 2, 0, 7); c.fill(); }
+        const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+        g.add(mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.012, 48), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), 0, deskTop + 0.006, 0.05));
+      } else g.add(mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.008, 48), std(0x4a4436, { roughness: 0.95, transparent: true, opacity: 0.97 }), 0, deskTop + 0.004, 0.05));
+      animal.root.position.set(0, deskTop + (sea ? 0.004 : food ? 0.012 : 0.008), 0.05);
+      if (seat.species.id.startsWith("c_elegans")) {
+        // A worm plate: a lawn of E. coli on the agar, and the tracks a worm
+        // leaves in it. The sea squirt's dish is sea water and gets neither.
+        const lawn = new THREE.Mesh(new THREE.CircleGeometry(0.125, 48), new THREE.MeshStandardMaterial({ color: 0x6e6448, roughness: 1, transparent: true, opacity: 0.75 }));
+        lawn.rotation.x = -Math.PI / 2; lawn.position.set(0, deskTop + 0.0092, 0.05); g.add(lawn);
+        const tracks = new THREE.Mesh(new THREE.RingGeometry(0.097, 0.113, 96), new THREE.MeshBasicMaterial({ color: 0x7d7052, transparent: true, opacity: 0.45 }));
+        tracks.rotation.x = -Math.PI / 2; tracks.position.set(0, deskTop + 0.0096, 0.05); g.add(tracks);
+      }
+    } else {
+      animal.root.position.set(0, deskTop, 0.12);
+    }
+  }
+  g.add(animal.root);
+  lamp.position.set(0.5, deskTop + 0.9, 0.3); g.add(lamp);
+  // The brain on its pedestal, to the animal's left.
+  const pedestal = mesh(new THREE.CylinderGeometry(0.025, 0.04, 1.05, 12), metal, -1.05, 0.525, 0.1);
+  const disc = mesh(new THREE.CylinderGeometry(0.24, 0.25, 0.02, 48), std(0x151c1f, { metalness: 0.3 }), -1.05, 1.06, 0.1);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.004, 8, 96), new THREE.MeshBasicMaterial({ color: seat.color, transparent: true, opacity: 0.7 }));
+  ring.rotation.x = Math.PI / 2; ring.position.set(-1.05, 1.072, 0.1);
+  const haze = new THREE.PointLight(seat.color, 0.35, 1.4, 2); haze.position.set(-1.05, 1.35, 0.1);
+  g.add(pedestal, disc, ring, haze);
+  const plate = makeNameplate(seat.title, seat.subtitle, seat.color);
+  plate.m.position.set(0, deskTop - 0.07, 0.43); if (housing === "tank") plate.m.position.set(0, deskTop - 0.12, 0.38);
+  g.add(plate.m);
+  stationRoot.add(g);
+  const st = { g, screen: { cv: scv, c: scv.getContext("2d"), tex: stex }, animal, haze, drive: 0, brain: null, plate, deskTop };
+  return st;
+}
+function attachBrain(st, meta, pts, color) {
+  const bv = buildBrainView(meta, pts, color);
+  bv.holder.position.set(-1.05, 1.36, 0.1);
+  st.g.add(bv.holder); st.brain = bv;
+  resize();
+}
+function clearStations() {
+  for (const st of stations) { stationRoot.remove(st.g); st.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
+  stations = [];
+}
+function layoutViews(seats) {
+  const n = seats.length + (G.mouse ? 1 : 0), width = Math.max(1, n) * SPACING;
+  // The fog follows the room. Fixed at 9-22 m, a stage of eight put the wide
+  // camera 20 m back and the stations came out as dots in the dark.
+  const back = 2.6 + width * 0.8;
+  scene.fog.near = Math.max(9, back * 0.8); scene.fog.far = Math.max(22, back + 12);
+  VIEWS = { wide: { pos: [0, 2.4 + width * 0.12, back], look: [0, 1.3, -1.2] }, world: { pos: [0, 2.9, 1.9], look: [0, 3.2, -2.5] } };
+  seats.forEach((s, i) => {
+    const x = (i - (n - 1) / 2) * SPACING;
+    // A worm is a quarter of a metre long on a plate; the camera comes down to
+    // the dish rather than showing a desk with a smudge on it.
+    const h = HOUSING[s.species.id];
+    // At water level and close: a 7-day larva is glass-clear, and from above
+    // and across the room it disappears into the tank.
+    VIEWS[`seat${i}`] = h === "tank" ? { pos: [x + 0.38, 1.1, 0.62], look: [x - 0.02, 1.03, -0.02] }
+      : h === "dish" ? { pos: [x + 0.2, 1.02, 0.36], look: [x, 0.765, 0.04] }
+      : { pos: [x + 0.7, 1.55, 1.05], look: [x - 0.15, 0.95, -0.25] };
+    VIEWS[`brain${i}`] = { pos: [x - 0.6, 1.55, 0.95], look: [x - 1.05, 1.3, 0.1] };
+  });
+  if (G.mouse) {
+    const x = (seats.length - (n - 1) / 2) * SPACING;
+    VIEWS.mouse = { pos: [x + 0.42, 1.08, 0.62], look: [x - 0.02, 0.86, 0.1] };
+    VIEWS.brainmouse = { pos: [x - 0.6, 1.55, 0.95], look: [x - 1.05, 1.3, 0.1] };
+  }
+  $("views").innerHTML = `<button type="button" data-view="wide">Everyone</button><button type="button" data-view="world">The world</button>` +
+    seats.map((s, i) => `<button type="button" data-view="seat${i}"><i style="background:${s.color}"></i>${esc(shortLabel(s.species))}${s.shuffled ? " (shuffled)" : ""}</button>`).join("") +
+    (G.mouse ? `<button type="button" data-view="mouse"><i style="background:${MOUSE_COLOR}"></i>Mouse (watching)</button><button type="button" data-view="mouseeyes">Through its eyes</button>` : "");
+  document.querySelectorAll(".views button").forEach((b) => b.addEventListener("click", () => {
+    // A second press on a seat swaps between the animal and its brain.
+    const v = b.dataset.view;
+    if (v === "mouseeyes") { enterMouseEyes(); pressView("mouseeyes"); return; }
+    exitMouseEyes();
+    const twin = v === "mouse" ? "brainmouse" : v.replace("seat", "brain");
+    goTo((v.startsWith("seat") || v === "mouse") && activeView === v ? twin : v);
+    if (activeView === twin) b.setAttribute("aria-pressed", "true");
+  }));
+}
+
+// ---------------------------------------------------------------- the mouse, who watches
+// Not a seat. Its station is shown the world map each turn and its cortex's
+// predicted response lights its neurons; nothing it does reaches the game.
+const MOUSE_COLOR = "#C9C3B6";
+let mouseWorker = null, mouseLoaded = null;
+function buildMouse(n, total) {
+  const species = roster.find((s) => s.id === "mouse_v1");
+  const m = { species, color: MOUSE_COLOR, title: "Mouse · visual cortex", subtitle: "watches the world; does not play", busy: false, looks: 0, state: "load" };
+  m.st = buildStation(m, n, total); stations.push(m.st);
+  m.frame = document.createElement("canvas"); m.frame.width = 256; m.frame.height = 144;
+  if (!mouseWorker) {
+    mouseWorker = rpcWorker("./mouse-worker.js", true);
+    mouseLoaded = new Promise((res, rej) => mouseWorker.on((msg) => { if (msg.type === "loaded") res(msg); if (msg.type === "error") rej(new Error(msg.message)); }));
+    mouseWorker.post({ type: "load", base: "./species/mouse_v1/" });
+  }
+  mouseLoaded.then(({ meta, ep }) => {
+    m.meta = meta; m.ep = ep; m.state = "ready";
+    // Where the two-photon stack put each recorded soma; the cells matched to
+    // the EM reconstruction are drawn as the sensory kind so they stand out.
+    const n = meta.n, xyz = new Float32Array(n * 3), kind = new Uint8Array(n).fill(2);
+    meta.units.soma_2p_um.forEach((p, i) => { xyz[i * 3] = p[0]; xyz[i * 3 + 1] = -p[2]; xyz[i * 3 + 2] = p[1]; if (meta.units.nucleus_id[i] != null) kind[i] = 3; });
+    attachBrain(m.st, { n, sensory: {}, motor: [] }, (() => { const pts = brainPoints({ n, sensory: {}, motor: [], species: "mouse_v1" }, null); pts.xyz = xyz; pts.kind = kind; return normalisePts(pts, n); })(), MOUSE_COLOR);
+    drawMouseMonitor(m); showBoard();
+  }).catch((e) => { m.state = "fault"; m.stateLine = String(e.message || e).slice(0, 80); drawMouseMonitor(m); showBoard(); });
+  return m;
+}
+function mouseBrainPoints(meta) {
+  const n = meta.n, xyz = new Float32Array(n * 3), kind = new Uint8Array(n).fill(2);
+  meta.units.soma_2p_um.forEach((p, i) => { xyz[i * 3] = p[0]; xyz[i * 3 + 1] = -p[2]; xyz[i * 3 + 2] = p[1]; if (meta.units.nucleus_id[i] != null) kind[i] = 3; });
+  const pts = brainPoints({ n, sensory: {}, motor: [], species: "mouse_v1" }, null); pts.xyz = xyz; pts.kind = kind; return normalisePts(pts, n);
+}
+function normalisePts(pts, n) {
+  const { xyz } = pts; const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], xyz[i * 3 + k]); hi[k] = Math.max(hi[k], xyz[i * 3 + k]); }
+  const c = lo.map((l, k) => (l + hi[k]) / 2), span = Math.max(...hi.map((h, k) => h - lo[k])) || 1;
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) xyz[i * 3 + k] = ((xyz[i * 3 + k] - c[k]) / span) * 0.5;
+  return pts;
+}
+function mouseFrameData() {
+  const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  c.canvas.width = 256; c.canvas.height = 144; c.fillStyle = "#000"; c.fillRect(0, 0, 256, 144); c.drawImage(worldCanvas, 0, 8, 256, 128);
+  const px = c.getImageData(0, 0, 256, 144).data, frame = new Float32Array(256 * 144);
+  for (let i = 0; i < frame.length; i++) { const o = i * 4; frame[i] = (0.299 * px[o] + 0.587 * px[o + 1] + 0.114 * px[o + 2]) / 255; }
+  return frame;
+}
+function mouseLook() {
+  const m = G.mouse; if (!m || m.state !== "ready" || m.busy) return;
+  // What it is shown: the world, letterboxed to the twin's 256 x 144, in grey.
+  const f = mouseFrameData();
+  const c = m.frame.getContext("2d", { willReadFrequently: true }), image = c.createImageData(256, 144);
+  for (let i = 0; i < f.length; i++) { const v = f[i] * 255, o = i * 4; image.data[o] = image.data[o + 1] = image.data[o + 2] = v; image.data[o + 3] = 255; }
+  c.putImageData(image, 0, 0);
+  m.busy = true; drawMouseMonitor(m); showBoard();
+  mouseWorker.call("look", { frame: f, frames: 15 }, [f.buffer]).then((r) => {
+    m.busy = false; m.looks++; m.ms = r.ms; m.ep = r.ep;
+    const a = m.st.brain.activity; let above = 0;
+    for (let u = 0; u < r.response.length; u++) { const v = r.response[u]; if (v > 1) above++; a[u] = Math.max(a[u], Math.min(1, Math.max(0, (v - 0.8) * 0.9))); }
+    m.above = above; m.st.driveTarget = Math.min(1, above / (0.3 * r.response.length));
+    m.lastResponse = r.response; if (pov) drawMouseRF();
+    drawMouseMonitor(m); showBoard();
+  }).catch((e) => { m.busy = false; m.state = "fault"; m.stateLine = String(e.message || e).slice(0, 80); showBoard(); });
+}
+// ---------------------------------------------------------------- through the mouse's eyes
+// The camera sits in the mouse's head and looks at its screen. Acuity: a mouse
+// resolves about 0.5 cycles per degree (a human about 60), so the scene is
+// rendered at roughly two samples per degree of a wide field of view and
+// smoothed up, plus the dichromat filter above. The panel beside it is the
+// data rather than optics: the frame the twin is shown, and every recorded
+// neuron at its receptive-field centre, lit by the twin's latest prediction.
+let pov = null;
+const MOUSE_FOV = 110;
+function enterMouseEyes() {
+  if (!G.mouse || pov) return;
+  pov = { fov: camera.fov, ratio: renderer.getPixelRatio() };
+  camera.fov = MOUSE_FOV;
+  camera.clearViewOffset();
+  // ~2 samples per degree across the view, whatever the window's width.
+  renderer.setPixelRatio(Math.max(0.05, (MOUSE_FOV * 2) / innerWidth));
+  resize(true);
+  canvas.classList.add("mouse-eye");
+  document.body.classList.add("in-pov");
+  $("pov").hidden = false;
+  tween = null;
+  drawMouseRF();
+}
+function exitMouseEyes() {
+  if (!pov) return;
+  camera.fov = pov.fov; renderer.setPixelRatio(pov.ratio); pov = null;
+  canvas.classList.remove("mouse-eye");
+  document.body.classList.remove("in-pov");
+  $("pov").hidden = true;
+  resize();
+}
+$("povExit").addEventListener("click", () => { exitMouseEyes(); goTo("wide"); });
+function followMouseEyes() {
+  const m = G.mouse; if (!pov) return;
+  if (!m || !m.st) { exitMouseEyes(); return; }       // the next game has no mouse
+  const head = m.st.animal.root.getObjectByName("head") || m.st.animal.root;
+  const neck = new THREE.Vector3(); head.getWorldPosition(neck);
+  const screen = new THREE.Vector3(m.st.g.position.x, m.st.deskTop + 0.42, -0.277);
+  // The head bone is the neck joint: a camera there saw the inside of its own
+  // skull, its eyes and its ears. The eyes are ~6 cm on towards the screen
+  // and a little up, so the view starts just in front of them.
+  const fwd = screen.clone().sub(neck).setY(0).normalize();
+  const eye = neck.clone().addScaledVector(fwd, 0.075); eye.y += 0.02;
+  camera.position.copy(eye);
+  const to = lookFrom(eye.toArray(), screen.toArray());
+  yaw = to.yaw; pitch = to.pitch; applyCamera();
+}
+function drawMouseRF() {
+  const m = G.mouse, c = $("povRF").getContext("2d"), W = 512, H = 288;
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  if (!m || !m.frame) return;
+  c.globalAlpha = 0.55; c.imageSmoothingEnabled = true; c.drawImage(m.frame, 0, 0, W, H); c.globalAlpha = 1;
+  if (!m.meta || !m.lastResponse) { $("povCaption").textContent = "Waiting for the mouse's first look at the map."; return; }
+  const rf = m.meta.units.rf_xy, r = m.lastResponse;
+  // Quiet neurons first, so the responding ones are drawn on top.
+  const order = [...r.keys()].sort((a, b) => r[a] - r[b]);
+  for (const u of order) {
+    const [x, y] = rf[u]; if (x == null) continue;
+    const v = Math.max(0, Math.min(1, (r[u] - 0.6) / 1.4));
+    c.fillStyle = `rgba(${Math.round(90 + 165 * v)},${Math.round(140 + 60 * v)},${Math.round(255 - 180 * v)},${0.25 + 0.7 * v})`;
+    c.beginPath(); c.arc(((x + 1) / 2) * W, ((y + 1) / 2) * H, 1.2 + 2.2 * v, 0, 7); c.fill();
+  }
+  $("povCaption").textContent = `The grey frame the digital twin is shown. Each dot is one of mouse 17797's ${fmt.format(m.meta.n)} recorded neurons, at the centre of its receptive field; bright means predicted above its usual level (${fmt.format(m.above)} are, after ${m.looks} look${m.looks > 1 ? "s" : ""}). Predictions of a model fitted to its recordings.`;
+}
+
+function drawMouseMonitor(m) {
+  const { c, cv, tex } = m.st.screen, W = cv.width, H = cv.height;
+  c.fillStyle = "#0c0e14"; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#161a24"; c.fillRect(0, 0, W, 48); c.textBaseline = "top";
+  c.fillStyle = MOUSE_COLOR; c.font = "600 22px Figtree, sans-serif"; c.fillText("WHAT THE MOUSE IS SHOWN", 16, 13);
+  c.imageSmoothingEnabled = false; c.drawImage(m.frame, 0, 48, 1280, 720);
+  c.fillStyle = "rgba(8,10,14,.78)"; c.fillRect(0, H - 64, W, 64);
+  c.fillStyle = "#E6E8EE"; c.font = "500 19px Figtree, sans-serif";
+  const line = m.state === "fault" ? `the cortex model could not run: ${m.stateLine}` : m.state === "load" ? "loading the cortex model (35 MB)…"
+    : m.busy ? "looking…" : m.looks ? `${fmt.format(m.above)} of ${fmt.format(m.meta.n)} recorded neurons predicted above their usual level` : "waiting for the first map";
+  c.fillText(line, 18, H - 50);
+  c.fillStyle = "#8C92A0"; c.font = "500 15px Figtree, sans-serif"; c.fillText("predictions of a model fitted to this mouse's recordings (MICrONS digital twin), not recordings and not a player", 18, H - 24);
+  tex.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- each monitor
+function drawMonitor(seat) {
+  const { c, cv, tex } = seat.st.screen, W = cv.width, H = cv.height, t = seat.turns[seat.turns.length - 1];
+  c.fillStyle = "#0c0e14"; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#161a24"; c.fillRect(0, 0, W, 48);
+  c.textBaseline = "top"; c.fillStyle = seat.color; c.font = "600 22px Figtree, sans-serif"; c.fillText("OPEN DOCTRINES", 16, 13);
+  c.fillStyle = "#E6E8EE"; c.font = "500 19px Figtree, sans-serif";
+  c.fillText(`${seat.country ? seat.country.name : "…"}  ·  ${seat.title}${seat.shuffled ? " (shuffled wiring)" : ""}`, 220, 14);
+  if (seat.conventionNote) {
+    c.fillStyle = "#E0624F"; c.font = "500 15px Figtree, sans-serif";
+    c.fillText("⚠ " + seat.conventionNote.slice(0, 120), 16, H - 22);
+  }
+  if (seat.crop && seat.lastOwners) c.drawImage(seat.mapCanvas, 0, 48, 860, 430);
+  c.strokeStyle = "#323846"; c.lineWidth = 2; c.strokeRect(0, 48, 860, 430);
+  c.fillStyle = "#161a24"; c.fillRect(860, 48, W - 860, H);
+  c.fillStyle = seat.color; c.font = "600 20px Figtree, sans-serif"; c.fillText("ITS ORDERS", 880, 64);
+  let y = 98;
   if (t) {
-    const p = t.pos, war = p.war.length ? p.war.join(" ") : "nobody";
-    [["Land", `${p.share.toFixed(2)}% of the world`], ["Army", fmt.format(p.army)], ["Treasury", fmt.format(Math.round(p.treasury))], ["At war with", war.slice(0, 34)]].forEach(([k, v], i) => {
-      sc.fillStyle = "#8C92A0"; sc.font = font(500, 16, "Figtree, sans-serif"); sc.fillText(k, s(24 + i * 270), s(622));
-      sc.fillStyle = k === "At war with" && p.war.length ? "#DC463C" : "#E6E8EE"; sc.font = font(600, 20, "JetBrains Mono, monospace"); sc.fillText(v, s(24 + i * 270), s(646));
+    if (!t.orders.length) { c.fillStyle = "#8C92A0"; c.font = "500 18px Figtree, sans-serif"; c.fillText(t.fault ? "(its brain faulted)" : seat.watcher ? "(it is not asked for orders)" : "(holds)", 880, y); }
+    t.orders.slice(0, 9).forEach(([m, name]) => { c.fillStyle = "#8C92A0"; c.font = "500 14px Figtree, sans-serif"; c.fillText(m, 880, y + 3); c.fillStyle = "#E6E8EE"; c.font = "500 18px Figtree, sans-serif"; c.fillText(name, 970, y); y += 28; });
+    c.fillStyle = seat.color; c.font = "600 20px Figtree, sans-serif"; c.fillText("ITS BRAIN", 880, 380);
+    c.fillStyle = "#E6E8EE"; c.font = "500 17px Figtree, sans-serif";
+    c.fillText(`${fmt.format(t.motor)} ${seat.species.id === "mouse_v1" ? "readout activity" : "motor spikes"}`, 880, 412);
+    c.fillText(`${fmt.format(t.fired)} of ${fmt.format(seat.meta.n)} neurons fired`, 880, 438);
+    c.fillStyle = "#8C92A0"; c.fillText(`thought for ${(t.ms / 1000).toFixed(2)} s`, 880, 464);
+    ["reward", "harm", "reserve", "threat"].forEach((k, i) => {
+      const yy = 500 + i * 46, v = (t.bySignal || {})[k] || 0, carried = (seat.carriers || {})[k];
+      c.fillStyle = "#8C92A0"; c.font = "500 15px Figtree, sans-serif"; c.fillText(`${k}${carried ? ` → ${carried}` : seat.state === "fault" ? "" : " (no sense carries it)"}`, 880, yy);
+      c.fillStyle = "#282e3c"; c.fillRect(880, yy + 20, 380, 9); c.fillStyle = carried ? "#6EAAE6" : "#3a3f4a"; c.fillRect(880, yy + 20, 380 * Math.min(1, v / 200), 9);
     });
-    sc.fillStyle = "#161a24"; sc.fillRect(s(24), s(700), s(1052), s(180));
-    sc.fillStyle = "#8C92A0"; sc.font = font(500, 16, "Figtree, sans-serif"); sc.fillText("Land held, % of the world", s(36), s(708));
-    const vals = G.turns.map((q) => q.pos.share), hi = Math.max(...vals) * 1.15, lo = Math.min(...vals) * 0.85;
-    sc.strokeStyle = "#F2B84B"; sc.lineWidth = s(3); sc.beginPath();
-    vals.forEach((v, i) => { const x = s(34) + s(1032) * (i / (TURNS - 1)), y = s(870) - s(130) * ((v - lo) / ((hi - lo) || 1)); i ? sc.lineTo(x, y) : sc.moveTo(x, y); }); sc.stroke();
-    sc.fillStyle = "#161a24"; sc.fillRect(s(1100), s(56), SW - s(1100), SH);
-    sc.fillStyle = "#F2B84B"; sc.font = font(600, 24, "Figtree, sans-serif"); sc.fillText("THE FLY'S ORDERS", s(1124), s(76));
-    let y = s(116);
-    if (!t.orders.length) { sc.fillStyle = "#8C92A0"; sc.font = font(500, 20, "Figtree, sans-serif"); sc.fillText("(holds)", s(1124), y); }
-    t.orders.slice(0, 13).forEach(([mod, name]) => { sc.fillStyle = "#8C92A0"; sc.font = font(500, 16, "Figtree, sans-serif"); sc.fillText(mod, s(1124), y + s(2)); sc.fillStyle = "#E6E8EE"; sc.font = font(500, 20, "Figtree, sans-serif"); sc.fillText(name, s(1224), y); y += s(30); });
-    sc.fillStyle = "#F2B84B"; sc.font = font(600, 24, "Figtree, sans-serif"); sc.fillText("BRAIN THIS TURN", s(1124), s(560));
-    sc.fillStyle = "#E6E8EE"; sc.font = font(500, 20, "Figtree, sans-serif"); sc.fillText(`${fmt.format(t.dn)} descending-neuron spikes`, s(1124), s(600));
-    sc.fillStyle = "#282e3c"; sc.fillRect(s(1124), s(632), s(452), s(16)); sc.fillStyle = "#F2B84B"; sc.fillRect(s(1124), s(632), s(452) * Math.min(1, t.dn / 750), s(16));
-    [["sugar", "sugar (treasury)"], ["bitter", "bitter (losses)"], ["water", "water (land)"], ["jon", "hearing (war)"]].forEach(([k, label], i) => {
-      const yy = s(672 + i * 42), v = t.rates[k] || 0;
-      sc.fillStyle = "#8C92A0"; sc.font = font(500, 16, "Figtree, sans-serif"); sc.fillText(label, s(1124), yy);
-      sc.fillStyle = "#282e3c"; sc.fillRect(s(1124), yy + s(20), s(452), s(10)); sc.fillStyle = "#6EAAE6"; sc.fillRect(s(1124), yy + s(20), s(452) * Math.min(1, v / 200), s(10));
+    const p = t.pos;
+    [["Land", `${p.share.toFixed(2)}%`], ["Army", fmt.format(p.army)], ["Treasury", fmt.format(Math.round(p.treasury))], ["Wars", p.war.length ? p.war.join(" ").slice(0, 22) : "none"]].forEach(([k, v], i) => {
+      c.fillStyle = "#8C92A0"; c.font = "500 15px Figtree, sans-serif"; c.fillText(k, 18 + i * 215, 492);
+      c.fillStyle = k === "Wars" && p.war.length ? "#DC463C" : "#E6E8EE"; c.font = "600 19px 'JetBrains Mono', monospace"; c.fillText(v, 18 + i * 215, 514);
     });
-    sc.fillStyle = "#8C92A0"; sc.font = font(500, 16, "Figtree, sans-serif"); sc.fillText(`${fmt.format(t.fired)} neurons fired  ·  thought for ${(t.brainMs / 1000).toFixed(2)} s`, s(1124), SH - s(40));
+    c.fillStyle = "#161a24"; c.fillRect(16, 556, 828, 150);
+    const vals = seat.turns.map((q) => q.pos.share), hi = Math.max(...vals) * 1.15, lo = Math.min(...vals) * 0.85;
+    c.strokeStyle = seat.color; c.lineWidth = 3; c.beginPath();
+    vals.forEach((v, i) => { const x = 26 + 808 * (i / Math.max(1, vals.length - 1)), yy = 696 - 120 * ((v - lo) / ((hi - lo) || 1)); i ? c.lineTo(x, yy) : c.moveTo(x, yy); }); c.stroke();
   }
-  if (G.over) {
-    sc.fillStyle = "rgba(8, 10, 14, 0.82)"; sc.fillRect(s(180), s(200), s(740), s(250)); sc.strokeStyle = "#F2B84B"; sc.lineWidth = s(2); sc.strokeRect(s(180), s(200), s(740), s(250));
-    sc.textAlign = "center"; sc.fillStyle = "#F2B84B"; sc.font = font(700, 44, "'Big Shoulders Display', sans-serif"); sc.fillText(G.over.title, s(550), s(232));
-    sc.fillStyle = "#E6E8EE"; sc.font = font(500, 24, "Figtree, sans-serif"); sc.fillText(G.over.line, s(550), s(310));
-    sc.fillStyle = "#8C92A0"; sc.font = font(500, 20, "Figtree, sans-serif"); sc.fillText(G.over.next, s(550), s(370)); sc.textAlign = "left";
+  if (seat.state === "dead" || seat.state === "fault") {
+    c.fillStyle = "rgba(8, 10, 14, 0.8)"; c.fillRect(140, 190, 580, 150); c.strokeStyle = "#E0624F"; c.lineWidth = 2; c.strokeRect(140, 190, 580, 150);
+    c.textAlign = "center"; c.fillStyle = "#E0624F"; c.font = "700 44px 'Big Shoulders Display', sans-serif"; c.fillText(seat.state === "dead" ? "WIPED OUT" : "BRAIN FAULTED", 430, 218);
+    c.fillStyle = "#E6E8EE"; c.font = "500 19px Figtree, sans-serif"; c.fillText(seat.stateLine || "", 430, 288); c.textAlign = "left";
   }
-  screenTex.needsUpdate = true;
+  tex.needsUpdate = true;
 }
 
-// ---------------------------------------------------------------- rail, record, spark
-const bars = [["sugar", "bSugar", "oSugar"], ["bitter", "bBitter", "oBitter"], ["water", "bWater", "oWater"], ["jon", "bJon", "oJon"]];
-const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function showTurn() {
-  const t = G.turns[G.turns.length - 1], m = G.meta;
-  $("gameLabel").textContent = m ? `Game ${m.game} · ${m.mapName} · seed ${m.seed}${odVersion ? ` · Open Doctrines ${odVersion}` : ""}` : "Getting ready";
-  $("gameWho").textContent = m ? m.name : "—";
-  $("gameTurn").textContent = t ? `Turn ${t.pos.turn + 1} of ${TURNS}` : "Starting…";
-  if (!t) return;
-  const p = t.pos;
-  $("land").textContent = `${p.share.toFixed(2)}%`; $("army").textContent = fmt.format(p.army); $("treasury").textContent = fmt.format(Math.round(p.treasury));
-  $("war").innerHTML = p.war.length ? p.war.map((w) => `<span class="chip">${esc(w)}</span>`).join("") : '<span class="peace">nobody</span>';
-  $("orders").innerHTML = t.orders.length ? t.orders.map(([a, b]) => `<li><span>${esc(a)}</span><span>${esc(b)}</span></li>`).join("") : '<li><span class="none">Holds everything</span></li>';
-  $("spikes").textContent = fmt.format(t.dn);
-  bars.forEach(([k, b, o]) => { const v = t.rates[k] || 0; $(b).style.width = `${Math.min(100, v / 2)}%`; $(o).textContent = Math.round(v); });
+// ---------------------------------------------------------------- the rail and the spark
+// A provenance note can run to a page; the card shows its first sentence and
+// keeps the rest on hover, so a warning is read rather than scrolled past.
+function briefly(text, max = 170) {
+  const first = text.split(/(?<=\.)\s/)[0];
+  return first.length <= max ? first : first.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
-const results = [];
-function showRecord() {
-  const list = $("record");
-  if (!results.length) { list.innerHTML = '<li><span class="empty">No finished games yet</span></li>'; return; }
-  list.innerHTML = results.slice(-8).reverse().map((r) => {
-    if (r.wipedOut) return `<li><span class="iso">${esc(r.iso)}</span><span class="how">wiped out, turn ${r.turn + 1}</span><span class="down">&minus;${r.start.toFixed(2)}</span></li>`;
-    const d = r.end - r.start;
-    return `<li><span class="iso">${esc(r.iso)}</span><span class="how">${r.start.toFixed(2)}% → ${r.end.toFixed(2)}%</span><span class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : ""}${d.toFixed(2)}</span></li>`;
-  }).join("");
+function showBoard() {
+  $("gameTurn").textContent = G.turn != null ? `Turn ${G.turn + 1} · no turn limit` : "—";
+  $("gameLabel").textContent = G.meta ? `Game ${G.meta.game} · ${G.meta.mapName} · seed ${G.meta.seed}${odVersion ? ` · Open Doctrines ${odVersion}` : ""}` : "Getting ready";
+  $("board").innerHTML = G.seats.map((s) => {
+    const t = s.turns[s.turns.length - 1], p = t && t.pos;
+    const d = p && s.start != null ? p.share - s.start : 0;
+    const state = s.watcher && s.state !== "dead" && s.state !== "fault" ? `<span class="state think">watching</span>`
+      : s.state === "won" ? `<span class="state">owns the whole map</span>` : s.state === "dead" ? `<span class="state dead">wiped out${s.harmTurns ? " · harm at maximum" : ""}</span>` : s.state === "fault" ? `<span class="state fault">brain faulted</span>`
+      : s.state === "think" ? `<span class="state think">thinking…</span>` : s.state === "load" ? `<span class="state think">${esc(s.stateLine || "loading")}</span>` : `<span class="state">${t ? `${(t.ms / 1000).toFixed(2)} s` : ""}</span>`;
+    return `<div class="card" style="--c:${s.color}"><div class="who"><strong>${esc(s.title)}${s.shuffled ? " · shuffled" : ""}</strong>${state}</div>
+      <div class="who"><span>${esc(s.country ? s.country.name : "—")}</span><span>${fmt.format(s.meta ? s.meta.n : 0)} neurons</span></div>
+      <div class="nums"><div><small>Land</small>${p ? p.share.toFixed(2) + "%" : "—"}</div><div><small>Change</small><span class="${d >= 0 ? "up" : "down"}">${p ? (d >= 0 ? "+" : "") + d.toFixed(2) : "—"}</span></div><div><small>Army</small>${p ? fmt.format(Math.round(p.army / 1000)) + "k" : "—"}</div><div><small>Wars</small>${p ? p.war.length : "—"}</div></div>
+      ${s.conventionNote ? `<div class="warn" title="${esc(s.conventionNote)}">⚠ ${esc(briefly(s.conventionNote))}</div>` : ""}
+      ${s.state === "dead" && s.harmTurns ? `<div class="warn">Its country is gone. Each turn since, its harm channel (${esc(s.carriers.harm || "none")}) has been driven at the maximum: ${fmt.format(s.harmFired)} neurons responded last turn. This is simulated input to a model; nothing here can feel it.</div>` : ""}
+      ${s.watcher ? `<div class="warn">⚠ ${esc((s.species.why_no_seat || "").split(". ")[0] || "shown the game, but it gives no orders")}. Its senses fire; nothing reaches its motor neurons.</div>` : ""}
+      <div class="orders">${t ? (t.orders.length ? t.orders.slice(0, 4).map(([m, n]) => `<b>${esc(n)}</b>`).join(" · ") + (t.orders.length > 4 ? ` +${t.orders.length - 4}` : "") : "holds") : "&nbsp;"}</div></div>`;
+  }).join("") + (G.mouse ? (() => { const m = G.mouse;
+    const st = m.state === "fault" ? `<span class="state fault">faulted</span>` : m.busy ? `<span class="state think">looking…</span>` : m.state === "load" ? `<span class="state think">loading</span>` : `<span class="state">${m.ms ? (m.ms / 1000).toFixed(2) + " s · " + m.ep : ""}</span>`;
+    return `<div class="card" style="--c:${MOUSE_COLOR}"><div class="who"><strong>Mouse · visual cortex</strong>${st}</div>
+      <div class="who"><span>watches the world · does not play</span><span>${m.meta ? fmt.format(m.meta.n) + " recorded neurons" : ""}</span></div>
+      <div class="orders">${m.looks ? `${fmt.format(m.above)} predicted above their usual level after ${m.looks} look${m.looks > 1 ? "s" : ""}` : "&nbsp;"}</div></div>`; })() : "");
 }
-/**
- * The ask, built from what just happened rather than written in advance.
- *
- * It names the country and the turn it died on, because "the fly lost Mexico
- * on turn 31" is a thing the viewer just watched and "try our game" is not.
- * Dismissal is remembered, so nobody is asked twice; localStorage can throw in
- * a private tab, hence the try/catch and the plain default of asking.
- */
-/**
- * Folding the setup panel, and starting folded on a phone.
- *
- * `matchMedia` rather than a width read, so a phone rotated into landscape
- * unfolds it and a desktop window dragged narrow folds it -- the panel follows
- * the same breakpoint the stylesheet uses instead of a second opinion about
- * what counts as small. Only while the viewer has not touched it: once they
- * fold or unfold it by hand, that is their decision and the resize stops
- * overriding it.
- */
-const narrow = matchMedia("(max-width: 900px)");
-let foldTouched = false;
-
-/** Publish the real heights of the bottom-anchored boxes, so the stack holds. */
-function measureStack() {
-  const bar = document.querySelector(".statusbar");
-  const set = $("setup");
-  if (bar) document.documentElement.style.setProperty("--barH", `${Math.round(bar.offsetHeight)}px`);
-  if (set) document.documentElement.style.setProperty("--setupH", `${Math.round(set.offsetHeight)}px`);
-}
-
-function setFold(open) {
-  $("setup").dataset.open = open ? "true" : "false";
-  $("setupFold").setAttribute("aria-expanded", open ? "true" : "false");
-  $("setupFold").querySelector("i").textContent = open ? "\u2212" : "+";
-  measureStack();
-}
-setFold(!narrow.matches);
-$("setupFold").addEventListener("click", () => {
-  foldTouched = true;
-  setFold($("setup").dataset.open !== "true");
-});
-narrow.addEventListener("change", (e) => { if (!foldTouched) setFold(!e.matches); });
-
-const PITCH_KEY = "open-fly-pitch-dismissed";
-let pitchDone = false;
-try { pitchDone = localStorage.getItem(PITCH_KEY) === "1"; } catch (e) { /* private tab */ }
-
-function showPitch(wiped, seat, start, last) {
-  if (pitchDone) return;
-  $("pitchTitle").textContent = wiped ? "The fly lost the country" : "The fly is bad at this";
-  $("pitchLine").textContent = wiped
-    ? `${seat.name} was wiped out on turn ${last.turn + 1}. You would probably do better.`
-    : `${seat.name} finished on ${last.share.toFixed(2)}% of the world, from ${start.toFixed(2)}%. You would probably do better.`;
-  // On a phone the folded menu and this card are stacked with 56px between
-  // them; an unfolded menu would sit under it. The ask is the more useful of
-  // the two at the moment a run ends, so it takes the space.
-  if (narrow.matches) setFold(false);
-  $("pitch").dataset.show = "true";
-}
-
-$("pitchHide").addEventListener("click", () => {
-  pitchDone = true;
-  $("pitch").dataset.show = "false";
-  try { localStorage.setItem(PITCH_KEY, "1"); } catch (e) { /* private tab: ask again next time */ }
-});
-
 const spark = $("spark");
 function drawSpark() {
   const r = spark.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
   spark.width = Math.round(r.width * dpr); spark.height = Math.round(r.height * dpr);
   const c = spark.getContext("2d"); c.scale(dpr, dpr);
-  const w = r.width, h = r.height, vals = G.turns.map((t) => t.pos.share);
+  const w = r.width, h = r.height;
   c.strokeStyle = "rgba(237, 230, 214, 0.08)"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, h - 6); c.lineTo(w, h - 6); c.stroke();
-  if (!vals.length) return;
-  G.turns.forEach((t, i) => { if (t.pos.war.length) { c.fillStyle = "rgba(224, 98, 79, 0.16)"; c.fillRect((w * i) / TURNS, 0, w / TURNS + 0.5, h); } });
-  const hi = Math.max(...vals) * 1.1, lo = Math.min(...vals) * 0.9;
-  const x = (i) => (w - 8) * (i / (TURNS - 1)) + 4, y = (v) => h - 8 - (h - 16) * ((v - lo) / ((hi - lo) || 1));
-  c.strokeStyle = "#F2B84B"; c.lineWidth = 2; c.lineJoin = "round"; c.beginPath(); vals.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
-  c.fillStyle = "#F2B84B"; c.beginPath(); c.arc(x(vals.length - 1), y(vals[vals.length - 1]), 3.5, 0, Math.PI * 2); c.fill();
+  const all = G.seats.flatMap((s) => s.turns.map((t) => t.pos.share)); if (!all.length) return;
+  const hi = Math.max(...all) * 1.1, lo = Math.min(...all) * 0.9;
+  const x = (i) => (w - 8) * (i / Math.max(1, all.length - 1)) + 4, y = (v) => h - 8 - (h - 16) * ((v - lo) / ((hi - lo) || 1));
+  for (const s of G.seats) {
+    const vals = s.turns.map((t) => t.pos.share); if (!vals.length) continue;
+    c.strokeStyle = s.color; c.lineWidth = 2; c.lineJoin = "round"; c.setLineDash(s.shuffled ? [4, 3] : []); c.beginPath();
+    vals.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
+  }
+  c.setLineDash([]);
 }
 const setNow = (title, detail) => { $("nowTitle").textContent = title; $("nowDetail").textContent = detail || " "; };
-
-// ---------------------------------------------------------------- the brain in the room
-let brainView = null, activity = null, actAttr = null, dnIndex = null;
-function buildBrainView(buf) {
-  const dv = new DataView(buf), n = dv.getUint32(8, true);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(buf, 16, n * 3), 3));
-  const cls = new Uint8Array(buf, 16 + n * 12, n), kind = new Float32Array(n); for (let i = 0; i < n; i++) kind[i] = cls[i];
-  geo.setAttribute("aKind", new THREE.BufferAttribute(kind, 1));
-  activity = new Float32Array(n); actAttr = new THREE.BufferAttribute(activity, 1); actAttr.setUsage(THREE.DynamicDrawUsage); geo.setAttribute("aAct", actAttr);
-  const mat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uScale: { value: 1 }, uPixel: { value: renderer.getPixelRatio() } },
-    vertexShader: `attribute float aKind; attribute float aAct; uniform float uScale; uniform float uPixel; varying vec3 vColor; varying float vAlpha;
-      void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); float hide = step(254.5, aKind);
-        vec3 base = vec3(0.30, 0.62, 0.58); float a = 0.11;
-        if (abs(aKind - 1.0) < 0.5) { base = vec3(0.30, 0.48, 0.58); a = 0.07; }
-        if (abs(aKind - 3.0) < 0.5) { base = vec3(0.50, 0.82, 0.68); a = 0.14; }
-        if (abs(aKind - 4.0) < 0.5) { base = vec3(0.95, 0.68, 0.25); a = 0.8; }
-        vColor = mix(base, vec3(1.0, 0.95, 0.80), clamp(aAct, 0.0, 1.0)); vAlpha = (a + aAct * 0.95) * (1.0 - hide);
-        float size = (aKind > 3.5 && aKind < 4.5 ? 2.6 : 1.6) + aAct * 5.0; gl_PointSize = size * uPixel * uScale / max(0.05, -mv.z); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `varying vec3 vColor; varying float vAlpha; void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d); if (r > 0.25) discard; gl_FragColor = vec4(vColor, vAlpha * smoothstep(0.25, 0.0, r)); }`,
-  });
-  const points = new THREE.Points(geo, mat); points.frustumCulled = false;
-  const holder = new THREE.Group(); holder.position.set(-1.15, 1.3, -0.35); holder.add(points);
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.31, 0.025, 64), new THREE.MeshStandardMaterial({ color: 0x151c1f, roughness: 0.6, metalness: 0.3 }));
-  disc.position.set(-1.15, 1.02, -0.35); disc.receiveShadow = true;
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.004, 8, 96), new THREE.MeshBasicMaterial({ color: 0xf2b84b, transparent: true, opacity: 0.55 }));
-  ring.rotation.x = Math.PI / 2; ring.position.set(-1.15, 1.035, -0.35);
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 1.02, 16), new THREE.MeshStandardMaterial({ color: 0x0f1416, roughness: 0.5, metalness: 0.5 }));
-  stem.position.set(-1.15, 0.51, -0.35); stem.castShadow = true;
-  const haze = new THREE.PointLight(0x6fb7ae, 0.5, 1.6, 2); haze.position.set(-1.15, 1.3, -0.35);
-  scene.add(holder, disc, ring, stem, haze);
-  brainView = { holder, mat, haze };
-}
-
-// ---------------------------------------------------------------- the fly
-const legs = {}, taps = { "-1": [], "1": [] };
-let neck = null, neckBase = null;
-function dress(root) {
-  root.traverse((o) => {
-    if (!o.isMesh) return;
-    // Only props cast shadows. The room's big surfaces (wall, floor) only receive them:
-    // casting as well is what drew the rings across them.
-    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-    const big = o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) > 1.2;
-    o.castShadow = !big; o.receiveShadow = true;
-    const m = o.material; if (!m) return;
-    if (m.name === "abdomen") {
-      const cv = document.createElement("canvas"); cv.width = 16; cv.height = 256; const c = cv.getContext("2d");
-      c.fillStyle = "#5a391a"; c.fillRect(0, 0, 16, 256); c.fillStyle = "#140c06"; for (let i = 0; i < 7; i++) c.fillRect(0, 22 + i * 32, 16, 12);
-      const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.flipY = false; m.map = tex; m.color.set(0xffffff); m.roughness = 0.45; m.needsUpdate = true;
-    }
-    if (m.name === "eye") { m.roughness = 0.32; m.metalness = 0; m.color.set(0x7a0806); }
-    if (m.name === "wing") { m.transparent = true; m.opacity = 0.26; m.depthWrite = false; m.side = THREE.DoubleSide; o.castShadow = false; }
-  });
-  const poster = root.getObjectByName("poster"); if (poster) poster.visible = false;
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.97, 0.03), new THREE.MeshStandardMaterial({ color: 0x14181b, roughness: 0.5, metalness: 0.4 }));
-  frame.position.set(-0.45, 1.98, -1.68); frame.castShadow = true;
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 0.86), new THREE.MeshBasicMaterial({ map: worldTex, toneMapped: false }));
-  wall.position.set(-0.45, 1.98, -1.66);
-  scene.add(frame, wall);
-  const screen = root.getObjectByName("screen");
-  if (screen) { screen.material = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }); screen.castShadow = false; }
-  for (const side of [-1, 1]) { const n = root.getObjectByName(`front_${side}_1`); if (n) legs[side] = { node: n, base: n.quaternion.clone() }; }
-  neck = root.getObjectByName("neck"); if (neck) neckBase = neck.quaternion.clone();
-}
-const clock = new THREE.Clock();
-const axisX = new THREE.Vector3(1, 0, 0), axisZ = new THREE.Vector3(0, 0, 1), q = new THREE.Quaternion();
-function animateFly(now) {
-  for (const side of [-1, 1]) {
-    const leg = legs[side]; if (!leg) continue;
-    const list = taps[String(side)]; while (list.length && now - list[0] > 0.3) list.shift();
-    let amt = 0; for (const st of list) { const p = (now - st) / 0.2; if (p >= 0 && p <= 1) amt = Math.max(amt, Math.sin(Math.PI * p)); }
-    leg.node.quaternion.copy(leg.base).multiply(q.setFromAxisAngle(axisX, amt * 0.26));
+function paintWorld(position) {
+  const owners = (() => { const ob = b64bytes(position.owners); return new Uint16Array(ob.buffer, 0, ob.length >> 1); })();
+  const edge = new Map(G.seats.filter((s) => s.country).map((s) => [s.country.id, hexRGB(s.color.slice(1))]));
+  paintInto(G.map.world, WW, WH, worldImage, owners, position.colors, edge); wc.putImageData(worldImage, 0, 0);
+  wc.fillStyle = "rgba(8, 10, 14, 0.75)"; wc.fillRect(24, 22, 900, 64); wc.fillStyle = "#F2B84B"; wc.font = "600 30px Figtree, sans-serif"; wc.textBaseline = "middle";
+  wc.fillText(`THE WORLD  ·  ${G.meta.mapName.toUpperCase()}  ·  TURN ${position.turn + 1}  ·  ${G.seats.length} ANIMALS`, 42, 54); worldTex.needsUpdate = true;
+  for (const s of G.seats) if (s.crop) {
+    paintInto(s.crop, MAPW, MAPH, s.mapImage, owners, position.colors, edge); s.mapCanvas.getContext("2d").putImageData(s.mapImage, 0, 0); s.lastOwners = true;
   }
-  if (neck && !reduceMotion) neck.quaternion.copy(neckBase).multiply(q.setFromAxisAngle(axisX, Math.sin(now * 0.9) * 0.03 + Math.sin(now * 2.3) * 0.012)).multiply(new THREE.Quaternion().setFromAxisAngle(axisZ, Math.sin(now * 0.6 + 1) * 0.035));
 }
 
-// ---------------------------------------------------------------- setup controls
-let maps = [], wanted = null, restartNow = false, gameNo = 0;
-const mapSelect = $("mapSelect"), countrySelect = $("countrySelect");
+// ---------------------------------------------------------------- setup
+let maps = [], plan = [], wanted = null, restartNow = false, gameNo = 0, odVersion = "";
+const G = { meta: null, seats: [], turn: null, map: null };
+const mapSelect = $("mapSelect");
 const prettyMap = (m) => (m.imported ? `${m.name} (imported)` : ({ map: "Modern day" }[m.name] || m.name));
-function fillMaps(selectPath) {
-  mapSelect.innerHTML = maps.map((m) => `<option value="${esc(m.path)}">${esc(prettyMap(m))}</option>`).join("");
-  if (selectPath) mapSelect.value = selectPath;
+function renderSeatRows() {
+  const opts = playable();
+  $("seatRows").innerHTML = plan.map((p, i) => `<div class="seatrow" style="--c:${SEAT_COLORS[i]}">
+    <div class="top"><select data-i="${i}" data-k="species" aria-label="Animal ${i + 1}">${opts.map((s) => `<option value="${s.id}" ${s.id === p.species ? "selected" : ""}>${esc(label(s))}${isWatcher(s) ? " — watches, cannot act" : ""}</option>`).join("")}</select>
+    <button type="button" class="x" data-rm="${i}" aria-label="Remove animal ${i + 1}" ${plan.length < 2 ? "disabled" : ""}>&times;</button></div>
+    <div class="row2"><select data-i="${i}" data-k="iso" aria-label="Country for animal ${i + 1}"><option value="">Random country</option>${(G.mapInfo ? G.mapInfo.seats : []).map((c) => `<option value="${c.iso}" ${c.iso === p.iso ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+    <select data-i="${i}" data-k="shuffled" aria-label="Wiring for animal ${i + 1}"><option value="">Its own wiring</option><option value="1" ${p.shuffled ? "selected" : ""}>Shuffled wiring</option></select></div></div>`).join("");
+  $("seatRows").querySelectorAll("select").forEach((el) => el.addEventListener("change", () => { const p = plan[+el.dataset.i]; p[el.dataset.k] = el.dataset.k === "shuffled" ? !!el.value : el.value; }));
+  $("seatRows").querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => { plan.splice(+b.dataset.rm, 1); renderSeatRows(); }));
+  $("addSeat").disabled = plan.length >= MAX_SEATS || !opts.length;
 }
-async function fillCountries() {
-  countrySelect.disabled = true;
-  countrySelect.innerHTML = '<option value="">Reading the map…</option>';
-  const info = await loadMap(mapSelect.value);
-  countrySelect.innerHTML = '<option value="">Random country</option>' + info.seats.map((c) => `<option value="${esc(c.iso)}">${esc(c.name)} · ${c.provinces} provinces</option>`).join("");
-  countrySelect.disabled = false;
+function renderPresets() {
+  const has = (id) => playable().some((s) => s.id === id);
+  const P = [];
+  if (has("drosophila_female") && has("drosophila_male")) P.push(["Female vs male fly", [{ species: "drosophila_female" }, { species: "drosophila_male" }]]);
+  if (has("mouse_v1") && has("drosophila_female")) P.push(["Mouse vs fruit fly · synthetic readout", [{ species: "mouse_v1" }, { species: "drosophila_female" }]]);
+  for (const s of playable()) { P.push([`${shortLabel(s)} vs its shuffled self`, [{ species: s.id }, { species: s.id, shuffled: true }]]); break; }
+  if (has("c_elegans_herm") && has("ciona_larva")) P.push(["Worm vs sea squirt", [{ species: "c_elegans_herm" }, { species: "ciona_larva" }]]);
+  // The published build has no worms (their data is local-only), and its
+  // first game should still be small: two brains of a few MB, not the flies'
+  // ~240 MB.
+  if (has("zebrafish_larva") && has("ciona_larva")) P.push(["Zebrafish vs sea squirt", [{ species: "zebrafish_larva" }, { species: "ciona_larva" }]]);
+  const actors = playable().filter((s) => !isWatcher(s));
+  if (actors.length > MAX_SEATS) console.warn(`${actors.length} animals can play but a stage seats ${MAX_SEATS}: "Everyone" leaves some out`);
+  if (actors.length > 2) P.push([actors.length > MAX_SEATS ? `The first ${MAX_SEATS} who can play` : "Everyone who can play", actors.slice(0, MAX_SEATS).map((s) => ({ species: s.id }))]);
+  // The fish in its tank: against the fly when it can play, beside it as a
+  // watcher when a later export finds its senses cut off again.
+  const fish = playable().find((s) => s.id === "zebrafish_larva");
+  if (fish && actors.length) P.push([isWatcher(fish) ? "A zebrafish in a tank" : "Zebrafish vs fruit fly", [{ species: fish.id }, { species: actors.find((a) => a.id !== fish.id).id }]]);
+  $("presets").innerHTML = P.map(([name], i) => `<button type="button" data-p="${i}">${esc(name)}</button>`).join("");
+  $("presets").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { plan = P[+b.dataset.p][1].map((x) => ({ iso: "", shuffled: false, ...x })); renderSeatRows(); }));
+  return P;
 }
-mapSelect.addEventListener("change", () => fillCountries().catch((e) => setNow("That map could not be read", String(e.message || e))));
-$("importBtn").addEventListener("click", () => $("importFile").click());
-$("importFile").addEventListener("change", async (e) => {
-  const f = e.target.files[0]; if (!f) return;
-  try {
-    const bytes = await f.arrayBuffer();
-    const r = await game.call("import", { name: f.name, bytes }, [bytes]);
-    maps = r.maps; fillMaps(r.path); await fillCountries();
-    $("setupNote").textContent = `Imported ${f.name}. Pick a country and start.`;
-  } catch (err) { $("setupNote").textContent = `Could not import ${f.name}: ${err.message || err}`; }
-  e.target.value = "";
-});
-$("startBtn").addEventListener("click", () => {
-  wanted = { path: mapSelect.value, iso: countrySelect.value || null };
-  restartNow = true;
-  setNow("Starting your game…", `${mapSelect.options[mapSelect.selectedIndex].text} · ${countrySelect.options[countrySelect.selectedIndex].text}`);
-});
+$("addSeat").addEventListener("click", () => { const opts = playable(); plan.push({ species: opts[plan.length % opts.length].id, iso: "", shuffled: false }); renderSeatRows(); });
+// A map changes which countries exist, so a country picked on the last map is
+// dropped rather than carried over to a map that may not have it.
+async function useMap(path) {
+  mapSelect.value = path;
+  G.mapInfo = await loadMap(path);
+  const here = new Set(G.mapInfo.seats.map((c) => c.iso));
+  for (const p of plan) if (p.iso && !here.has(p.iso)) p.iso = "";
+  renderSeatRows();
+}
+mapSelect.addEventListener("change", () => useMap(mapSelect.value).catch((e) => setupSay(`That map could not be read: ${e.message || e}`, true)));
+const setupSay = (text, warn) => { $("setupNote").className = warn ? "note warn" : "note"; $("setupNote").textContent = text; };
 
-// ---------------------------------------------------------------- the game loop: the fly plays, forever
-let groups = null, odVersion = "";
+// ── YOUR OWN MAP ──
+// An .odmap from the map editor (or anywhere) goes into the game module's own
+// filesystem and is played by path, exactly as Open Fly imports one. It lives
+// for this visit: a reload forgets it. Checked by reading it the way a stage
+// will, so a file that is not a map fails here, with the reason, and not
+// halfway through seating the animals.
+async function importMap(file) {
+  if (!/\.odmap$/i.test(file.name)) { setupSay(`${file.name} is not an .odmap file.`, true); return; }
+  setupSay(`Importing ${file.name}…`);
+  // A failed import leaves the menu as it was: the map that was picked stays
+  // picked, and the file that failed is not offered again.
+  const before = mapSelect.value;
+  const fillMaps = () => { mapSelect.innerHTML = maps.map((m) => `<option value="${esc(m.path)}">${esc(prettyMap(m))}</option>`).join(""); };
+  let r = null;
+  try {
+    const bytes = await file.arrayBuffer();
+    r = await game.call("import", { name: file.name, bytes }, [bytes]);
+    maps = r.maps;
+    fillMaps(); mapSelect.value = before;
+    const info = await loadMap(r.path);
+    if (!info.seats.length) throw new Error("it has no countries with provinces");
+    await useMap(r.path);
+    setupSay(`Imported ${file.name}: ${info.seats.length} countries. Pick the animals' countries, or leave them random, and start. It is kept for this visit only.`);
+  } catch (e) {
+    if (r && r.path) { maps = maps.filter((m) => m.path !== r.path); mapCache.delete(r.path); fillMaps(); mapSelect.value = before; }
+    setupSay(`Could not use ${file.name}: ${e.message || e}. An .odmap is a zip with countries.json, provinces.json and provinces.png.`, true);
+  }
+}
+$("importBtn").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importMap(f); e.target.value = ""; });
+addEventListener("dragover", (e) => { if ([...e.dataTransfer.items].some((i) => i.kind === "file")) e.preventDefault(); });
+addEventListener("drop", (e) => { const f = [...e.dataTransfer.files].find((x) => /\.odmap$/i.test(x.name)); if (f) { e.preventDefault(); importMap(f); } });
+$("startBtn").addEventListener("click", () => {
+  const isos = plan.map((p) => p.iso).filter(Boolean);
+  if (new Set(isos).size !== isos.length) { $("setupNote").className = "note warn"; $("setupNote").textContent = "Two animals on one country is a race, not a game: the game would take whichever orders came last. Pick different countries."; return; }
+  $("setupNote").className = "note"; $("setupNote").textContent = "Starting…";
+  wanted = { path: mapSelect.value, plan: plan.map((p) => ({ ...p })) }; restartNow = true;
+});
+const narrow = matchMedia("(max-width: 900px)");
+function setFold(open) { $("setup").dataset.open = open ? "true" : "false"; $("setupFold").setAttribute("aria-expanded", String(open)); $("setupFold").querySelector("i").textContent = open ? "−" : "+"; }
+setFold(!narrow.matches);
+$("setupFold").addEventListener("click", () => setFold($("setup").dataset.open !== "true"));
+
+// ---------------------------------------------------------------- the game loop: they play, forever
+const TITLE = { e: "Economy", p: "Politics", w: "War", n: "Navy" };
+async function newStage(choice) {
+  const map = await loadMap(choice.path);
+  G.map = map;
+  const pool = map.seats.filter((c) => c.provinces >= Math.min(12, map.seats[0].provinces));
+  const taken = new Set(choice.plan.map((p) => p.iso).filter(Boolean));
+  const seats = choice.plan.map((p, i) => {
+    const species = roster.find((s) => s.id === p.species);
+    let country = p.iso ? map.seats.find((c) => c.iso === p.iso) : null;
+    if (!country) { const free = pool.filter((c) => !taken.has(c.iso)); country = free[Math.floor(Math.random() * free.length)]; taken.add(country.iso); }
+    return { i, species, watcher: isWatcher(species), shuffled: !!p.shuffled, country, color: SEAT_COLORS[i], title: label(species),
+      subtitle: `${country.name}${p.shuffled ? " · shuffled wiring" : ""}`, turns: [], state: "load", start: null, landless: 0, fault: null,
+      // Read by the monitor and the board for EVERY seat, including one whose
+      // brain never loaded. A faulted seat without them threw here and took
+      // the whole stage down, which is the one thing a fault must not do.
+      carriers: {}, meta: { n: 0, senses: {}, groups: {} }, motor: new Int32Array(0) };
+  });
+  clearStations();
+  G.seats = seats;
+  // ONE COUNT FOR THE WHOLE ROW. Seats were spaced for the seats alone while
+  // the mouse's station and every camera view were spaced for seats + mouse,
+  // so the mouse's desk sat half on the last seat's and each seat's camera
+  // looked 0.65 m to the side of its animal.
+  const mouseIsPlaying = choice.plan.some((p) => p.species === "mouse_v1");
+  const withMouse = available.has("mouse_v1") && $("mouseOn").checked && !mouseIsPlaying;
+  const total = seats.length + (withMouse ? 1 : 0);
+  seats.forEach((s, i) => {
+    s.st = buildStation(s, i, total); stations.push(s.st);
+    s.mapCanvas = document.createElement("canvas"); s.mapCanvas.width = MAPW; s.mapCanvas.height = MAPH;
+    s.mapImage = s.mapCanvas.getContext("2d").createImageData(MAPW, MAPH);
+  });
+  G.mouse = withMouse ? buildMouse(seats.length, total) : null;
+  layoutViews(seats); goTo("wide", !G.meta);
+  // THE WORLD AND THE BRAINS LOAD TOGETHER. Building the world is the game
+  // worker's job and loading brains is theirs; neither needs the other, and
+  // doing them one after the other made the first game wait for the sum.
+  G.seed = (Math.random() * 0x7fffffff) >>> 0;
+  G.staged = game.call("stage", { map: `${choice.path}:rung`, isos: seats.map((s) => s.country.iso), seed: G.seed, turns: 0 });
+  setNow(`Building the world for ${seats.length} animals…`, "the game and every brain load at once");
+  // Every brain loads in parallel, each in its own worker. A brain that fails
+  // to load faults its seat; it does not take the stage with it.
+  await Promise.all(seats.map(async (s) => {
+    try {
+      const b = brainFor(s.species, s.shuffled, (f) => { s.stateLine = `downloading ${Math.round(f * 100)}%`; showBoard(); }, s.i);
+      const m = await b.loaded;
+      s.brain = b; s.meta = m.meta;
+      s.motor = Int32Array.from(motorOf(m.meta));
+      s.carriers = {}; for (const [ch, sig] of Object.entries(m.meta.senses || {})) s.carriers[sig] = s.carriers[sig] ? `${s.carriers[sig]}, ${ch}` : ch;
+      // A convention is OUR claim about this animal, so it is shown beside it
+      // rather than left in a provenance block nobody opens. The package's own
+      // wording wins over the roster's summary.
+      const prov = m.meta.provenance || {};
+      // The sentence, not the rule's name: a package may carry both, and
+      // "mece-ganglia-v1" tells a viewer nothing about what was assumed.
+      const said = Object.values(prov).find((v) => typeof v === "string" && v.includes("CONVENTION (not a source annotation)"));
+      s.conventionNote = (said ? said.slice(said.indexOf("CONVENTION")) : null) || s.species.warning
+        || (prov.convention ? `a stated convention (${prov.convention}); see ${prov.convention_doc || "the package's provenance"}` : null);
+      let posBuf = null;
+      // Where the source put each neuron, when it says; the shuffle moves wires, not cells.
+      try { const r = await fetch(`./species/${s.species.id}/positions.bin`); if (r.ok && (r.headers.get("content-type") || "").includes("octet")) posBuf = await r.arrayBuffer(); } catch (_) { /* layout by role */ }
+      attachBrain(s.st, m.meta, s.species.id === "mouse_v1" ? mouseBrainPoints(m.meta) : brainPoints(m.meta, posBuf), s.color);
+      s.state = "ready";
+    } catch (e) { s.state = "fault"; s.fault = String(e.message || e); s.stateLine = s.fault.slice(0, 60); s.meta = s.meta || { n: 0 }; }
+    showBoard();
+  }));
+  return seats;
+}
 async function playForever() {
-  let carry = null;                    // a country YOU picked comes back after a wipe-out; a random one does not
   for (;;) {
-    const choice = wanted || { path: maps.find((m) => m.name === "1914")?.path || maps[0].path, iso: null };
-    restartNow = false;
-    const map = await loadMap(choice.path);
-    const pool = map.seats.filter((c) => c.provinces >= Math.min(12, map.seats[0].provinces));
-    const seat = carry || (choice.iso ? map.seats.find((c) => c.iso === choice.iso) : pool[Math.floor(Math.random() * pool.length)]);
-    carry = null;
-    const seed = (Math.random() * 0x7fffffff) >>> 0;
+    const choice = wanted || { path: maps.find((m) => m.name === "1914")?.path || maps[0].path, plan };
+    wanted = null; restartNow = false;
+    const seats = await newStage(choice);
+    const seed = G.seed;
     const mapName = prettyMap(maps.find((m) => m.path === choice.path) || { name: choice.path });
-    setNow(`Loading ${seat.name}…`, `${mapName} · seed ${seed}`);
-    const begin = await game.call("begin", { seat: `${choice.path}:${seat.iso}:rung`, seed, turns: TURNS });
-    if (!begin.ok) { setNow(`${seat.name} could not be loaded`, "Trying another game in a moment"); wanted = null; await sleep(3000); continue; }
+    setNow(`Seating ${seats.length} animals…`, `${mapName} · seed ${seed} · building the world`);
+    const began = await G.staged;
+    if (began.seats !== seats.length) { setNow("That stage could not be set", "Trying again with new countries"); await sleep(2500); continue; }
     gameNo += 1;
-    G.meta = { game: gameNo, seed, name: seat.name, iso: seat.iso, cid: seat.id, mapName };
-    G.turns = []; G.over = null;
-    G.crop = await seatCrop(map, seat.id); G.map = map;
-    activity && activity.fill(0);
-    showTurn(); drawSpark(); drawScreen();
-    const enc = new Encoder();
-    let landless = 0, start = null, last = null, wiped = false;
-    for (;;) {
-      if (restartNow) break;
-      const { position } = await game.call("position", { withMap: true });
-      last = position;
-      if (start === null) start = position.share;
-      if (position.over) break;
-      landless = position.mine === 0 ? landless + 1 : 0;
-      if (landless >= 2) { wiped = true; break; }
+    G.meta = { game: gameNo, seed, mapName }; G.turn = 0;
+    for (const s of seats) { s.crop = await seatCrop(G.map, s.country.id); s.enc = new Encoder(); }
+    $("setupNote").className = "note"; $("setupNote").textContent = "A stage with two animals on it compares two mappings we wrote, not two animals. The fair opponent is the same brain with its wiring shuffled.";
+    showBoard();
+    let over = false;
+    while (!over && !restartNow) {
       const t0 = performance.now();
-      const rates = enc.rates(position);
-      const tSeed = turnSeed(BRAIN_SEED, position.iso, position.turn);
-      const { counts, ms } = await brainW.call("run", { rates, windowMs: WINDOW_MS, seed: tSeed });
-      const { tokens } = choose(counts, groups, position, tSeed);
-      const { moves } = await game.call("play", { tokens: tokens.join(",") });
-      const nameOf = new Map(Object.entries(position.legal).flatMap(([m, list]) => list.map((x) => [`${m}:${x.a}`, x.name])));
-      const title = { e: "Economy", p: "Politics", w: "War", n: "Navy" };
-      const orders = moves.filter((mv) => mv.outcome === "did" && !mv.token.endsWith(":0")).map((mv) => [title[mv.token[0]], nameOf.get(mv.token) || mv.token]);
-      let dn = 0, fired = 0;
-      for (const i of dnIndex) dn += counts[i];
-      for (let i = 0; i < counts.length; i++) if (counts[i]) { fired++; activity[i] = Math.max(activity[i], Math.min(1, 0.45 + 0.18 * Math.log2(1 + counts[i]))); }
-      if (brainView) brainView.haze.intensity = 0.4 + Math.min(1.6, dn / 350);
-      const now = clock.getElapsedTime(); orders.slice(0, 8).forEach((_, i) => taps[i % 2 ? "1" : "-1"].push(now + i * 0.13));
-      G.turns.push({ pos: position, orders, dn, fired, rates, brainMs: ms });
-      paintInto(G.crop, MAPW, MAPH, mapImage, position, seat.id); mc.putImageData(mapImage, 0, 0);
-      paintInto(map.world, WW, WH, worldImage, position, seat.id); wc.putImageData(worldImage, 0, 0);
-      wc.fillStyle = "rgba(8, 10, 14, 0.72)"; wc.fillRect(24, 22, 620, 64); wc.fillStyle = "#F2B84B"; wc.font = "600 30px Figtree, sans-serif"; wc.textBaseline = "middle";
-      wc.fillText(`THE WORLD  ·  ${mapName.toUpperCase()}  ·  TURN ${position.turn + 1}`, 42, 54); worldTex.needsUpdate = true;
-      showTurn(); drawSpark(); drawScreen();
-      setNow(`Game ${gameNo}: ${seat.name}`, `turn ${position.turn + 1}/${TURNS} · ${orders.length} orders · brain ${(ms / 1000).toFixed(2)} s`);
+      // Everyone reads the same world before anyone moves.
+      const positions = [];
+      for (const s of seats) positions.push((await game.call("seatPosition", { seat: s.i, withMap: s.i === 0 })).position);
+      G.turn = positions[0].turn;
+      if (positions[0].over) break;
+      for (const s of seats) { const p = positions[s.i]; if (s.start === null) s.start = p.share; s.landless = p.mine === 0 ? s.landless + 1 : 0; if (s.landless > 0 && s.state !== "dead") { s.state = "dead"; s.stateLine = `on turn ${p.turn + 1}`; } }
+      const live = seats.filter((s) => s.state !== "dead");
+      if (!live.length) break;
+      const winner = live.find((s) => positions[s.i].share >= 100 - 1e-6);
+      if (winner) { winner.state = "won"; winner.stateLine = "owns the whole map"; break; }
+      paintWorld(positions[0]);
+      // ── AFTER ELIMINATION: THE HARM CHANNEL AT ITS MAXIMUM ──
+      // A seat with no land left is no longer asked for orders. From then on,
+      // every turn, the sensory neurons that carry its "harm" signal are driven
+      // at the most the encoding allows (200 Hz), and nothing else, and its
+      // brain on the pedestal shows the response in red. That is simulated
+      // input to a model of a wiring diagram: nothing here can feel it, and the
+      // page says so. It runs only after the game is lost for that seat, so it
+      // changes no game and no benchmark (tools/stage_bench.mjs stops at a wipe).
+      for (const s of seats.filter((x) => x.species.id !== "mouse_v1" && x.state === "dead" && x.brain && x.meta && x.meta.senses)) {
+        const harm = Object.fromEntries(Object.entries(s.meta.senses).map(([ch, sig]) => [ch, sig === "harm" ? 200 : 0]));
+        const p = positions[s.i];
+        s.brain.w.call("run", { rates: harm, windowMs: s.meta.window_ms || WINDOW_MS, seed: turnSeed(BRAIN_SEED, p.iso, p.turn) }).then((r) => {
+          const act = s.st.brain && s.st.brain.activity; let fired = 0;
+          for (let i = 0; i < r.counts.length; i++) if (r.counts[i]) { fired++; if (act) act[i] = Math.max(act[i], Math.min(1, 0.55 + 0.2 * Math.log2(1 + r.counts[i]))); }
+          if (s.st.brain) s.st.brain.mat.uniforms.uSeat.value.set(0xE0624F);
+          s.st.haze.color.set(0xE0624F); s.st.haze.intensity = 1.6; s.st.driveTarget = 1;
+          s.harmFired = fired; s.harmTurns = (s.harmTurns || 0) + 1;
+          showBoard();
+        }).catch(() => { /* a faulted brain has nothing to show */ });
+      }
+      live.forEach((s) => { if (s.state !== "fault") s.state = "think"; }); showBoard();
+      // Brains think in parallel, one worker each; the page shows who is still thinking.
+      const thought = await Promise.all(live.map(async (s) => {
+        const p = positions[s.i];
+        const { bySignal, rates } = s.enc.rates(p, s.meta.senses || {});
+        if (s.state === "fault") return { s, p, bySignal, fault: true };
+        const tSeed = turnSeed(BRAIN_SEED, p.iso, p.turn);
+        try {
+          if (s.species.id === "mouse_v1") {
+            const frame = mouseFrameData();
+            const r = await s.brain.w.call("look", { frame, frames: 15 }, [frame.buffer]);
+            const counts = Uint16Array.from(r.response, (hz) => Math.min(65535, Math.max(0, Math.round(hz * (s.meta.window_ms || WINDOW_MS) / 1000))));
+            s.state = "ready"; showBoard();
+            return { s, p, bySignal, counts, ms: r.ms, tSeed };
+          }
+          const r = await s.brain.w.call("run", { rates, windowMs: s.meta.window_ms || WINDOW_MS, seed: tSeed });
+          s.state = "ready"; showBoard();
+          return { s, p, bySignal, counts: r.counts, ms: r.ms, tSeed };
+        } catch (e) { s.state = "fault"; s.stateLine = String(e.message || e).slice(0, 60); return { s, p, bySignal, fault: true }; }
+      }));
+      // Orders go in rotating seat order, so nobody always moves first.
+      const rot = G.turn % thought.length;
+      for (const r of [...thought.slice(rot), ...thought.slice(0, rot)]) {
+        const { s, p } = r;
+        let orders = [], motor = 0, fired = 0;
+        if (!r.fault && s.watcher) {
+          // It was shown the game and its brain ran; it is asked for nothing.
+          for (const i of s.motor) motor += r.counts[i];
+          const act = s.st.brain && s.st.brain.activity;
+          for (let i = 0; i < r.counts.length; i++) if (r.counts[i]) { fired++; if (act) act[i] = Math.max(act[i], Math.min(1, 0.45 + 0.18 * Math.log2(1 + r.counts[i]))); }
+          s.st.driveTarget = Math.min(1, fired / 400);
+          s.st.haze.intensity = 0.3 + s.st.drive * 1.2;
+        } else if (!r.fault) {
+          const { tokens } = choose(r.counts, s.meta.groups, p, r.tSeed);
+          const { moves } = await game.call("seatPlay", { seat: s.i, tokens: tokens.join(",") });
+          const nameOf = new Map(Object.entries(p.legal).flatMap(([m, list]) => list.map((x) => [`${m}:${x.a}`, x.name])));
+          orders = moves.filter((mv) => mv.outcome === "did" && !mv.token.endsWith(":0")).map((mv) => [TITLE[mv.token[0]], nameOf.get(mv.token) || mv.token]);
+          for (const i of s.motor) motor += r.counts[i];
+          const act = s.st.brain && s.st.brain.activity;
+          for (let i = 0; i < r.counts.length; i++) if (r.counts[i]) { fired++; if (act) act[i] = Math.max(act[i], Math.min(1, 0.45 + 0.18 * Math.log2(1 + r.counts[i]))); }
+          s.st.driveTarget = Math.min(1, orders.length / 6 + motor / Math.max(50, s.motor.length * 2));
+          s.st.haze.intensity = 0.3 + s.st.drive * 1.2;
+        }
+        s.turns.push({ pos: p, orders, motor, fired, bySignal: r.bySignal, ms: r.ms || 0, fault: r.fault });
+        if (s.turns.length > HISTORY_LIMIT) s.turns.shift();
+      }
+      paintWorld(positions[0]);
+      mouseLook();
+      for (const s of seats) drawMonitor(s);
+      showBoard(); drawSpark();
+      const slowest = Math.max(...thought.map((r) => r.ms || 0));
+      setNow(`Game ${gameNo}: turn ${G.turn + 1}`, `${live.length} of ${seats.length} still playing · slowest brain ${(slowest / 1000).toFixed(2)} s`);
       const pace = +$("speedSelect").value - (performance.now() - t0);
       if (pace > 0) await sleep(pace);
       if (restartNow) break;
       const end = await game.call("endTurn");
-      if (!end.more) { last = (await game.call("position", { withMap: false })).position; break; }
+      if (!end.more) over = true;
     }
     if (restartNow) continue;
-    const record = wiped ? { iso: seat.iso, wipedOut: true, turn: last.turn, start } : { iso: seat.iso, start, end: last.share };
-    results.push(record); showRecord();
-    G.over = wiped
-      ? { title: "WIPED OUT", line: `${seat.name} was wiped out on turn ${last.turn + 1}`, next: choice.iso ? "The same country starts again, new seed" : "A new country starts next" }
-      : { title: "GAME OVER", line: `${seat.name}: ${start.toFixed(2)}% → ${last.share.toFixed(2)}% of the world`, next: "The next game starts in a few seconds" };
-    drawScreen();
-    setNow(wiped ? `${seat.name} wiped out on turn ${last.turn + 1}` : `Game ${gameNo} over: ${last.share.toFixed(2)}% of the world`, G.over.next);
-    showPitch(wiped, seat, start, last);
-    // Only a country the viewer chose is replayed. In random mode a quick wipe-out used to
-    // bring the same seat straight back, so a doomed one (Mexico, 1914) looped forever.
-    if (wiped && choice.iso) carry = seat;
-    const pauseTicks = +$("speedSelect").value === 0 ? 4 : 16;   // 2 s on the fastest speed, 8 s otherwise
-    for (let i = 0; i < pauseTicks && !restartNow; i++) await sleep(500);
+    // Standings, stated as what they are.
+    const ranked = [...seats].sort((a, b) => ((b.turns.at(-1)?.pos.share ?? 0) - (a.turns.at(-1)?.pos.share ?? 0)));
+    setNow(`Game ${gameNo} over: ${ranked.map((s) => `${shortLabel(s.species)}${s.shuffled ? " (shuffled)" : ""} ${s.state === "dead" ? "wiped out" : (s.turns.at(-1)?.pos.share ?? 0).toFixed(2) + "%"}`).join(" · ")}`,
+      "Read that as a result about the mappings, not the animals. The next game starts in a few seconds.");
+    for (let i = 0; i < 20 && !restartNow; i++) await sleep(500);
   }
 }
 
@@ -795,27 +1621,51 @@ async function playForever() {
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h;
-  if (w > 900) camera.setViewOffset(w, h, 60, 0, w, h); else camera.clearViewOffset();
+  // A clean frame (record.js) has no panels to make room for.
+  if (w > 900 && !pov && !document.body.classList.contains("oas-clean")) camera.setViewOffset(w, h, -40, 0, w, h); else camera.clearViewOffset();
+  if (pov) renderer.setPixelRatio(Math.max(0.05, (MOUSE_FOV * 2) / w));
   camera.updateProjectionMatrix();
-  if (brainView) brainView.mat.uniforms.uScale.value = (h / 900) * 1.1;
+  for (const st of stations) if (st.brain) st.brain.mat.uniforms.uScale.value = (h / 900) * 1.1;
   drawSpark();
-  // The status bar changes height between one and two columns at the
-  // breakpoint, and the boxes stacked above it are placed from that number.
-  measureStack();
 }
 addEventListener("resize", resize);
 resize();
-
-let lastMs = performance.now();
+// ?debug hands the scene to the console, for checking camera views and
+// stations by measurement instead of by squinting at screenshots.
+if (new URLSearchParams(location.search).has("debug")) window.__stage = { camera, scene, G, views: () => VIEWS, goTo, game, brains };
+// ?record and ?capture hand the camera and the clock to web/record.js. Under
+// ?capture time is VIRTUAL: nothing renders on its own, and each step() moves
+// the page's clock on by exactly 1/30 s and draws one frame, so a frame grabber
+// gets smooth motion however slow the machine is.
+const RECQ = new URLSearchParams(location.search), CAPTURE = RECQ.has("capture");
+let vms = 0;
+const clock = CAPTURE ? { getElapsedTime: () => vms / 1000 } : new THREE.Clock();
+let lastMs = CAPTURE ? 0 : performance.now();
+if (RECQ.has("record") || CAPTURE) window.__oas = {
+  camera, scene, renderer, canvas, G, game, views: () => VIEWS, goTo, resize, enterMouseEyes, exitMouseEyes, capture: CAPTURE,
+  inPov: () => !!pov, beforeRender: null, now: () => clock.getElapsedTime(),
+  // Put the camera at pos looking at look, and keep the page's own yaw/pitch in
+  // step, so dragging after a tour continues from where the tour left it.
+  aim(pos, look) { camera.position.set(...pos); const to = lookFrom(pos, look); yaw = to.yaw; pitch = to.pitch; tween = null; applyCamera(); },
+  step(n = 1) { for (let i = 0; i < n; i++) { vms += 1000 / 30; loop(vms); } },
+};
+// A turn sets how active the animal should look; it gets there over about
+// half a second, and the target fades between turns. Snapping to it made every
+// turn a visible jolt.
+function easeDrive(st, dt) {
+  st.driveTarget = (st.driveTarget || 0) * Math.exp(-dt * 0.8);
+  st.drive += (st.driveTarget - st.drive) * (1 - Math.exp(-dt * 2.5));
+}
 function loop(nowMs) {
   const dt = Math.min(0.1, (nowMs - lastMs) / 1000); lastMs = nowMs;
   const now = clock.getElapsedTime();
-  if (tween) {
+  if (pov) followMouseEyes();
+  else if (tween) {
     tween.t = Math.min(1, tween.t + dt / 1.2); const e = tween.t < 0.5 ? 4 * tween.t ** 3 : 1 - (-2 * tween.t + 2) ** 3 / 2;
     camera.position.lerpVectors(tween.p0, tween.p1, e); yaw = tween.y0 + (tween.y1 - tween.y0) * e; pitch = tween.q0 + (tween.q1 - tween.q0) * e; applyCamera();
     if (tween.t >= 1) tween = null;
   }
-  const v = 1.1 * (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 3.2 : 1) * dt;
+  const v = 1.4 * (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 3.2 : 1) * dt;
   const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation), right = new THREE.Vector3(1, 0, 0).applyEuler(camera.rotation);
   let moved = false;
   if (keys.has("KeyW") || keys.has("ArrowUp")) { camera.position.addScaledVector(fwd, v); moved = true; }
@@ -825,51 +1675,72 @@ function loop(nowMs) {
   if (keys.has("KeyE")) { camera.position.y += v; moved = true; }
   if (keys.has("KeyQ")) { camera.position.y -= v; moved = true; }
   if (moved) { tween = null; pressView(""); }
-  if (activity) {
-    const k = Math.exp(-dt * 2.2);
-    for (let i = 0; i < activity.length; i++) activity[i] = activity[i] > 0.002 ? activity[i] * k : 0;
-    actAttr.needsUpdate = true;
-    if (!reduceMotion) brainView.holder.rotation.y = now * 0.12;
+  const k = Math.exp(-dt * 2.2);
+  for (const s of G.seats) {
+    const st = s.st; if (!st) continue;
+    easeDrive(st, dt);
+    if (!reduceMotion) st.animal.animate(now, s.state === "dead" ? 0 : st.drive);
+    if (st.brain) {
+      const a = st.brain.activity; for (let i = 0; i < a.length; i++) a[i] = a[i] > 0.002 ? a[i] * k : 0;
+      st.brain.actAttr.needsUpdate = true;
+      if (!reduceMotion) st.brain.holder.rotation.y = now * 0.12;
+    }
   }
-  animateFly(now);
+  if (G.mouse && G.mouse.st) {
+    const st = G.mouse.st; easeDrive(st, dt);
+    if (!reduceMotion) st.animal.animate(now, st.drive);
+    if (st.brain) { const a = st.brain.activity; for (let i = 0; i < a.length; i++) a[i] = a[i] > 0.002 ? a[i] * k : 0; st.brain.actAttr.needsUpdate = true; if (!reduceMotion) st.brain.holder.rotation.y = now * 0.12; }
+  }
+  if (window.__oas && window.__oas.beforeRender) window.__oas.beforeRender(dt, now);
   renderer.render(scene, camera);
-  requestAnimationFrame(loop);
+  if (!CAPTURE) requestAnimationFrame(loop);
 }
 
 (async () => {
+  // Opened as a file, the workers and the game module are refused by the
+  // browser and the page would sit on its loading screen forever. Say so.
+  if (location.protocol === "file:") {
+    $("loadText").className = "err";
+    $("loadText").textContent = "This page has to be served, not opened as a file. In a terminal: tools/serve.sh — then open http://localhost:8102";
+    return;
+  }
   try {
-    loadText.textContent = "Loading the room…";
-    const root = await new Promise((res, rej) => new THREE.GLTFLoader().load("./scene.gltf", (g) => res(g.scene), undefined, rej));
-    scene.add(root); dress(root); drawScreen();
-    requestAnimationFrame(loop);
-
-    loadText.textContent = "Downloading the connectome (91 MB)…";
-    const brainLoaded = new Promise((res, rej) => brainW.on((m) => {
-      if (m.type === "progress" && m.total) loadText.textContent = `Downloading the connectome: ${Math.round((100 * m.got) / m.total)}% of ${Math.round(m.total / 1e6)} MB…`;
-      if (m.type === "loaded") res(m);
-      if (m.type === "error") rej(new Error(m.message));
-    }));
-    brainW.post({ type: "load", metaUrl: "./data/brain.json", connectomeManifest: "./data/connectome.pack.json" });
-    const gameReady = new Promise((res, rej) => game.on((m) => {
+    const loadText = $("loadText");
+    if (!CAPTURE) requestAnimationFrame(loop);
+    loadText.textContent = "Reading the roster…";
+    await readRoster();
+    if (!playable().length) throw new Error("no species package is in ./species/. Run the exporters in tools/ first (see README).");
+    loadText.textContent = "Loading the animals…";
+    await loadModels(roster.map((s) => s.id));
+    const presets = renderPresets();
+    $("mouseRow").hidden = !available.has("mouse_v1");
+    // THE FIRST STAGE OPENS FAST. Two fly brains are ~240 MB and the male's
+    // takes half a minute to unpack, so opening on them looked like a page
+    // that does not load. The first game uses small brains; the flies are one
+    // click away.
+    const light = presets.find(([name]) => /Worm vs sea squirt/.test(name)) || presets.find(([name]) => /Zebrafish vs sea squirt/.test(name)) || presets[0];
+    plan = light ? light[1].map((x) => ({ iso: "", shuffled: false, ...x })) : [{ species: playable()[0].id, iso: "", shuffled: false }];
+    loadText.textContent = "Starting Open Doctrines…";
+    await new Promise((res, rej) => game.on((m) => {
       if (m.type === "progress" && m.total) loadText.textContent = `Downloading Open Doctrines: ${Math.round((100 * m.got) / m.total)}%…`;
       if (m.type === "ready") res();
       if (m.type === "error") rej(new Error(m.message));
     }));
-    const [loaded] = await Promise.all([brainLoaded, gameReady]);
     try { odVersion = (await (await fetch("./agent/VERSION", { cache: "no-cache" })).text()).trim(); } catch (_) { /* unknown build */ }
-    groups = loaded.meta.groups; dnIndex = Int32Array.from(loaded.meta.dn);
-    loadText.textContent = "Placing 138,639 neurons…";
-    buildBrainView(await (await fetch("./data/brain.bin")).arrayBuffer());
-    resize();
     loadText.textContent = "Reading the maps…";
     maps = (await game.call("maps")).maps;
     const first = maps.find((m) => m.name === "1914") || maps[0];
-    fillMaps(first.path); await fillCountries();
+    mapSelect.innerHTML = maps.map((m) => `<option value="${esc(m.path)}">${esc(prettyMap(m))}</option>`).join("");
+    mapSelect.value = first.path;
+    G.mapInfo = await loadMap(first.path);
+    renderSeatRows();
     $("loading").dataset.done = "true";
-    playForever().catch((e) => { console.error(e); setNow("The game stopped", String(e.message || e)); });
+    playForever().catch((e) => { console.error(e); setNow("The stage stopped", String(e.message || e)); });
   } catch (e) {
-    loadText.className = "err";
-    loadText.textContent = `Could not start: ${e && e.message ? e.message : e}`;
+    $("loadText").className = "err";
+    $("loadText").textContent = `Could not start: ${e && e.message ? e.message : e}`;
   }
 })();
 </script>
+<!-- ?record: a clean frame and a canvas recorder; ?capture: frame-exact capture for tools/trailer. -->
+<script type="module" src="./record.js"></script>

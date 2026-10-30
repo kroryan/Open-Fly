@@ -1,0 +1,8 @@
+diff --git a/src/Game.h b/src/Game.h
+index b135177..3ba8e21 100644
+--- a/src/Game.h
++++ b/src/Game.h
+@@ -425,1 +425,2 @@
+-    bool agentOver() const { return m_turnNumber >= m_agentUntilTurn; }
++    // A zero turn limit means a live session ends on conquest or elimination.
++    bool agentOver() const { return m_agentUntilTurn > 0 && m_turnNumber >= m_agentUntilTurn; }

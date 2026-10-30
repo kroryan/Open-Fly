@@ -1,25 +1,23 @@
 # Open Fly
 
-**A simulated fruit-fly brain plays [Open Doctrines](https://github.com/Pr1nted/Open-Doctrines), live in your browser.**
+**Connectome-based animals play [Open Doctrines](https://github.com/Pr1nted/Open-Doctrines), live in a 3D stage.**
 
 ![A fly at a desk playing Open Doctrines, its brain lit up beside it](docs/itch/thumbnail.png)
 
-The brain is the leaky integrate-and-fire model of the whole adult *Drosophila*
-brain from Shiu et al. (2024), built on the FlyWire connectome: 138,639 neurons
-and about 15 million synaptic connections. It runs in the page, in a worker, and
-matches the original Brian2 model spike for spike on a scripted input. The game
-is Open Doctrines' own engine compiled to WebAssembly and driven through its
-agent session. It uses the same menu of actions and the same per-turn budget
-as the game's trained AI.
+Open Fly combines Open Animal Stage's 3D room, animal models, animations and
+species catalogue with Open Doctrines' own game engine compiled to WebAssembly.
+Locally built desktop apps can include the available fly, larva, worm, sea
+squirt, zebrafish and mouse brain packages. The mouse is visual cortex, so its
+game actions use a labelled synthetic visual-to-action mapping, not biological
+motor output.
 
 Each turn:
 
-1. What happened to the country stimulates real sensory neurons. Land gained and
-   a surplus are **sugar**; land lost, a deficit and new wars are **bitter**; the
-   treasury is **water**; the number of wars drives the antenna's **Johnston's
-   organ**.
-2. The brain runs for 200 ms of simulated time.
-3. Its 1,299 descending neurons, dealt into 39 action groups, choose the orders.
+1. Each animal receives the shared country signals through the sensory mapping
+   in its brain package. The mouse instead sees a greyscale rendering of the
+   world and its predicted visual response drives the synthetic action mapping.
+2. The brain runs for its package's simulation window.
+3. Activity in the package's action groups chooses the orders.
 
 It is not a living fly, and nothing about it learned to play. How game events
 reach the brain and how its output reaches the game is our design. It was written
@@ -29,35 +27,31 @@ down in [PREREGISTRATION.md](PREREGISTRATION.md) before the fly played.
 
 ## In short
 
-- **One line:** A simulated fruit-fly brain plays Open Doctrines, live in your browser.
-- **One paragraph:** Open Fly wires the FlyWire connectome of an adult fruit fly
-  (138,639 neurons) into a strategy game. Every turn, gains and losses reach the
-  brain as taste and touch, the brain runs for 200 ms, and its descending neurons
-  give the orders. It is not trained and not good at it. You can watch it think,
-  pick its map and country, and hand it your own.
+- **One line:** Animal connectomes play Open Doctrines in a 3D stage.
+- **One paragraph:** Choose the available species, map and country; their
+  connectome-based packages receive inputs and select game actions. The brain
+  mappings and sensory conventions are documented in the catalogue and shown
+  beside the animals.
 
 ## What the page does
 
-- A 3D room with a free camera: the fly at the keyboard, the brain beside it with
-  every spike drawn, the whole world on the wall and the fly's country on the monitor.
-- Any map that ships with the game, or an `.odmap` you import. Any country, or a
-  random one. A country that is wiped out restarts the same game with a new seed.
+- A 3D room with animal models, animations, brain activity and game monitors.
+- Any map that ships with the game, or an `.odmap` you import. Games have no
+  turn cap; an animal is eliminated as soon as it has no territory, and a game
+  ends when a player owns the whole map or all seats are eliminated.
 - It follows the game. Every Open Doctrines release rebuilds the page, has the fly
   play it, and posts a devlog (see [docs/releasing.md](docs/releasing.md)).
 
 ## Run it locally
 
 ```bash
-tools/build_web_agent.sh ../OpenDoctrines          # web/agent: the game module (needs Emscripten)
-python3 tools/export_web_brain.py --fly-data fly --out web/data   # web/data: the brain
+tools/build_desktop_assets.sh ../OpenDoctrines v1.3.0b  # local species packages + game module
 python3 -m http.server 8767 --directory web
 ```
 
-`fly/` needs `Completeness_783.csv` and `Connectivity_783.parquet` from
-[philshiu/Drosophila_brain_model](https://github.com/philshiu/Drosophila_brain_model),
-and `neuron_annotations.tsv` from
-[flyconnectome/flywire_annotations](https://github.com/flyconnectome/flywire_annotations).
-The release workflow fetches the same files.
+The asset script needs Emscripten and Python packages `numpy`, `pandas` and
+`openpyxl`. It downloads the published packages and exports the local-only
+larva and worm data from a pinned source checkout into ignored `web/species/`.
 
 To deploy: `tools/pack_web.py` splits the two large files into gzip parts under
 Cloudflare Pages' 25 MiB limit. `tools/stage_web.py --out dist` copies what the
@@ -69,6 +63,16 @@ and game, and prints what the fly did.
 The Python version, which plays the native server through a FIFO, is in
 `open_fly/`. The Colab notebook `notebooks/open_fly_colab.ipynb` runs it with no
 setup.
+
+## Desktop builds
+
+Open Fly can be packaged as a Linux `.deb` installer and AppImage, and as a
+Windows NSIS `.exe` installer using Tauri 2. See [desktop/README.md](desktop/README.md)
+for build requirements and commands. Run `tools/build_desktop_assets.sh` first;
+it fetches or exports the brain packages into ignored local data folders and
+builds the pinned game module. Linux `.deb`/AppImage and Windows NSIS `.exe`
+bundles then include those files locally and need no runtime data downloads.
+Generated brain data and executables are not included in source pushes.
 
 ## The fly did not research until 2026-09-21
 
@@ -91,23 +95,15 @@ the policy does. Nothing about that is done for it.
 
 ## Credits
 
-- Brain model: Shiu et al., "A Drosophila computational brain model reveals
-  sensorimotor processing", *Nature* 634, 210-219 (2024).
-  [philshiu/Drosophila_brain_model](https://github.com/philshiu/Drosophila_brain_model), MIT.
-- Connectome: Dorkenwald et al., "Neuronal wiring diagram of an adult brain",
-  *Nature* 634, 124-138 (2024); Schlegel et al., "Whole-brain annotation and
-  multi-connectome cell typing of *Drosophila*", *Nature* 634, 139-152 (2024),
-  and the further papers FlyWire's citation table asks for, listed in
-  [web/data/LICENSE.txt](web/data/LICENSE.txt).
+- Stage and models: [Pr1nted/Open-Animal-Stage](https://github.com/Pr1nted/Open-Animal-Stage), Apache-2.0.
+- Species citations and resource terms: `web/roster.json` and the source links in each entry.
 - Game: Open Doctrines by Pr1nted.
 
 ## Licences
 
 - **Code:** Apache 2.0. See [NOTICE](NOTICE).
-- **Brain data:** FlyWire's public release is **CC BY-NC 4.0**, and so is
-  everything the site serves that is derived from it (`connectome.bin`,
-  `brain.bin`, `brain.json`). It may be shared and adapted with credit, but
-  **never used commercially**. That is why Open Fly takes no payments, donations
-  or ads. Details and the list of changes are in
-  [web/data/LICENSE.txt](web/data/LICENSE.txt).
+- **Brain data:** datasets are build inputs, not committed files. Their source,
+  attribution and redistribution status are recorded in `web/roster.json`.
+  Local desktop builds may contain packages that are not cleared for public
+  redistribution; those binaries stay on the owner's machine.
 - **Open Doctrines**, which the page runs, is under its own non-commercial licence.

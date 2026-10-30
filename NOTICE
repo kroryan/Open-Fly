@@ -1,23 +1,27 @@
 Open Fly
-Copyright 2026 Pr1nted
+Copyright 2026 Open Fly contributors
 
 Code in this repository is licensed under the Apache License 2.0 (LICENSE).
 
-Third-party material:
+Third-party code and assets:
 
-- open_fly/brain.py reproduces the neuron and synapse equations and
-  constants of model.py from philshiu/Drosophila_brain_model,
-  Copyright (c) 2023 Philip Shiu and Nico Spiller, licensed under the MIT License.
-- open_fly/sensory_ids.json lists FlyWire neuron ids taken from the
-  notebooks of the same repository (MIT).
-- The FlyWire connectome and annotations are not included; they are downloaded
-  at run time. Cite the FlyWire papers listed in README.md when using results.
-- FlyWire data is licensed separately from this code, under CC BY-NC 4.0
-  (https://flywire.ai/guidelines), and so is everything derived from it. That
-  covers web/data/brain.json, committed here, and the connectome.bin and
-  brain.bin the website serves, which are built in CI and never committed. Any
-  use of them must be non-commercial and credit FlyWire. The licence, the
-  changes made and the citations FlyWire asks for are in web/data/LICENSE.txt,
-  which the website serves beside the files.
-- patches/opendoctrines-agent-door.patch modifies Open Doctrines
-  (github.com/Pr1nted/Open-Doctrines) under that project's own licence.
+- Open Animal Stage runtime code and the eight animal GLB models were adapted
+  from Pr1nted/Open-Animal-Stage at commit
+  4cb2c8610c801febf355279e58a920897ce99e3e, Apache-2.0. License text:
+  web/vendor/licenses/OPEN-ANIMAL-STAGE-APACHE-2.0.txt.
+- OpenDoctrinesAgent and its game engine are built from Open Doctrines under
+  that project's licence. The local-only build applies the stage and unlimited
+  turn patches in patches/ to a temporary worktree.
+- onnxruntime-web 1.30.0, MIT; Three.js r128, MIT; fflate 0.8.2, MIT. License
+  texts are in web/vendor/licenses/.
+- Fonts bundled under web/vendor/fonts/ are Big Shoulders Display, Figtree and
+  JetBrains Mono, licensed under SIL OFL 1.1; texts are in web/vendor/licenses/.
+
+Brain datasets are generated or downloaded into ignored web/species/ for local
+desktop builds and are not committed or pushed. The catalogue web/roster.json
+records their source, attribution, availability and per-package terms. In
+particular, FlyWire is CC BY-NC 4.0; Winding et al. larva and Cook et al.
+hermaphrodite/male worm exports have no stated open redistribution licence;
+MICrONS digital-twin weights have no stated licence. Those packages are for
+the owner's local builds only. Build outputs are also ignored and are not
+published by the source push.

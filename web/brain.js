@@ -1,7 +1,7 @@
-// The FlyWire whole-brain model, in the browser.
+// Any animal's brain, in the browser: one engine for every species on the stage.
 //
-// The same model brain.py runs in Brian2 -- Shiu et al., Nature 2024, model.py
-// (MIT) -- with the same equations, constants and order of operations per step:
+// The neuron is Open Fly's, which is Shiu et al. (Nature 2024) ported off Brian2
+// and checked spike for spike against it:
 //
 //   dv/dt = (v_0 - v + g) / t_mbr     (frozen while refractory)
 //   dg/dt = -g / tau                   (frozen while refractory)
@@ -9,68 +9,130 @@
 //   a spike adds w = count * w_syn to g of each target, t_dly later
 //   a sensory input spike adds w_syn * f_poi to v of its neuron at once
 //
-// Brian2 integrates this linear system exactly; so does this, with the closed
-// form below. Its schedule per 0.1 ms step is groups -> thresholds ->
-// synapses -> resets, and so is this loop's. Random numbers come from a
-// different generator, so a window here is a different draw from the same
-// process as a Brian2 window -- which is what tools/validate_brain.mjs checks.
+// step() below is Open Fly's FlyBrain.step with two additions, and neither runs
+// for a species that does not need it: with no gap junctions and no shuffle this
+// is the same arithmetic in the same order, so the female fly on this stage is
+// the fly Open Fly validated. tools/check_fly_identity.mjs holds it to that.
 //
-// EVENT-DRIVEN. Of 138,639 neurons, a 200 ms window moves a few thousand off
-// rest. A neuron at rest stays at rest under these equations, so only neurons
-// that have received input are integrated; the rest cost nothing. That is what
-// makes 2,000 steps over the whole brain fit in a second or two of JavaScript.
+// ELECTRICAL SYNAPSES. The worm and the sea squirt are wired by gap junctions as
+// much as by chemical synapses -- a fifth of the sea squirt's wiring -- and a
+// gap junction is not a delayed kick to g, it is a current that flows both ways
+// for as long as two neurons differ. After integration each step, a junction of
+// strength s between i and j moves v_i by w_gap * s * (v_j - v_i) * dt / t_mbr,
+// and v_j the other way; refractory neurons are frozen and take no part. A
+// neuron with a junction never goes to sleep, because a coupled neighbour can
+// move it without a spike: the event-driven shortcut is only safe for neurons
+// whose every input arrives as an event.
+//
+// THE SHUFFLED CONTROL. shuffle(seed) permutes the postsynaptic column of the
+// connectome (and the far end of every gap junction). Every neuron keeps its
+// out-degree, in-degree, sign, and the exact weights it sends; sensory and motor
+// sets do not move. Parallel edges that the permutation creates stay two entries
+// and are both delivered, so nothing merges and no weight is lost -- the failure
+// open_animal_stage/shuffle.py records for a merging shuffle. Self-loops are
+// swapped away. What changes is who is wired to whom, and nothing else, which
+// is what makes it the one opponent on the stage that isolates the wiring.
 
-export class FlyBrain {
+export class AnimalBrain {
   constructor(connectome, meta) {
     const dv = new DataView(connectome);
     const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
-    if (magic !== "SFC1") throw new Error("connectome.bin has the wrong header");
-    const n = dv.getUint32(4, true), nsyn = dv.getUint32(8, true);
-    let off = 12;
-    this.n = n;
+    let off, n, nsyn, ngap = 0;
+    if (magic === "OAS1") {
+      n = dv.getUint32(4, true); nsyn = dv.getUint32(8, true); ngap = dv.getUint32(12, true); off = 16;
+    } else if (magic === "SFC1") {                  // Open Fly's own file, as it ships
+      n = dv.getUint32(4, true); nsyn = dv.getUint32(8, true); off = 12;
+    } else throw new Error(`connectome.bin: unknown header "${magic}"`);
+    this.n = n; this.nsyn = nsyn; this.ngap = ngap;
     this.indptr = new Uint32Array(connectome, off, n + 1); off += (n + 1) * 4;
     this.post = new Uint32Array(connectome, off, nsyn); off += nsyn * 4;
-    // A VIEW, NOT A COPY. slice() here allocated a second 28.8 MB array of the
-    // same 15,091,983 values, on top of the 91 MB buffer that indptr and post
-    // are views on and which is therefore retained anyway -- so the copy cost
-    // a quarter of the brain worker's footprint and bought nothing. That is
-    // the kind of margin a phone tab is killed over.
-    //
-    // The offset is 12 + (n+1)*4 + nsyn*4, so it is always a multiple of four
-    // and always aligned for Int16Array; checked against the real file, the
-    // view reads the same 15,091,983 values the copy did.
-    this.count = new Int16Array(connectome, off, nsyn);
+    this.count = new Int16Array(connectome, off, nsyn); off += nsyn * 2;
+    // Open Fly's SFC1 ends here with no padding, so the gap arrays are only
+    // located when there are any.
+    if (ngap) {
+      off = (off + 3) & ~3;
+      this.gapA = new Uint32Array(connectome, off, ngap); off += ngap * 4;
+      this.gapB = new Uint32Array(connectome, off, ngap); off += ngap * 4;
+      this.gapW = new Float32Array(connectome, off, ngap); off += ngap * 4;
+    } else { this.gapA = new Uint32Array(0); this.gapB = new Uint32Array(0); this.gapW = new Float32Array(0); }
+    if (off > connectome.byteLength) throw new Error("connectome.bin is shorter than its header says");
+    for (let i = 0; i < n; i++) if (this.indptr[i] > this.indptr[i + 1]) throw new Error("connectome.bin: indptr is not monotone");
+    if (this.indptr[n] !== nsyn) throw new Error("connectome.bin: indptr does not end at the synapse count");
+
     const P = meta.params;
     this.P = P;
     this.dt = P.dt;
     this.em = Math.exp(-P.dt / P.t_mbr);
     this.es = Math.exp(-P.dt / P.tau);
-    this.k = P.tau / (P.tau - P.t_mbr);          // v gets k*g of the g term
+    this.k = P.tau / (P.tau - P.t_mbr);
     this.delaySteps = Math.round(P.t_dly / P.dt);
     this.rfcSteps = Math.round(P.t_rfc / P.dt);
     this.wSyn = P.w_syn;
     this.wPoisson = P.w_syn * P.f_poi;
-    // FLOAT64, as Brian2. With 32-bit state the two engines agreed on every
-    // mechanism and still parted after ~55 ms of a stimulus, rounding near
-    // threshold; in 64-bit the same scripted input gives the same 3,063 spikes
-    // on the same steps from the same neurons. 2 MB is the price.
+    this.gapGain = ngap && P.w_gap ? P.w_gap * P.dt / P.t_mbr : 0;
     this.v = new Float64Array(n).fill(P.v_0);
     this.g = new Float64Array(n);
-    this.rfc = new Uint16Array(n);                // steps of refractoriness left
-    this.noRfc = new Uint8Array(n);               // sensory inputs have none
+    this.rfc = new Uint16Array(n);
+    this.noRfc = new Uint8Array(n);
     this.awake = new Uint8Array(n);
     this.awakeList = new Int32Array(n);
     this.awakeCount = 0;
+    // Neurons a junction can move without a spike, kept awake for good.
+    this.pinned = new Uint8Array(n);
+    if (this.gapGain) for (let e = 0; e < ngap; e++) { this.pinned[this.gapA[e]] = 1; this.pinned[this.gapB[e]] = 1; }
     this.sensory = {};
     for (const [ch, idx] of Object.entries(meta.sensory)) {
       this.sensory[ch] = Int32Array.from(idx);
       for (const i of idx) this.noRfc[i] = 1;
     }
-    // Spikes in flight: one bucket of (target, weight) per step of delay.
     this.ring = [];
-    for (let s = 0; s <= this.delaySteps; s++) this.ring.push({ post: new Int32Array(1 << 16), w: new Float64Array(1 << 16), len: 0 });
+    for (let s = 0; s <= this.delaySteps; s++) this.ring.push({ post: new Int32Array(1 << 12), w: new Float64Array(1 << 12), len: 0 });
     this.head = 0;
     this.spikesStep = new Int32Array(n);
+    this.shuffled = null;
+    this.wakePinned();
+  }
+
+  wakePinned() { for (let i = 0; i < this.n; i++) if (this.pinned[i]) this.wake(i); }
+
+  // The control. Deterministic in `seed`, so a shuffled seat is the same brain
+  // every game and can be reported as one. Takes a copy: the real wiring stays
+  // in the buffer, untouched, for anything else that reads it.
+  // `gain` (default 1, the original control) scales synaptic and input weight
+  // for the rewired brain only. Rewiring breaks the paths from the senses to
+  // the motor neurons, so at gain 1 the control barely responds -- and a quiet
+  // brain plays a different game (it hardly acts) rather than the same game
+  // with different wiring. The activity-matched control sets the gain so the
+  // rewired brain responds as broadly as the real one under the same drive
+  // (tools/calibrate.mjs, params.shuffled_gain). See PREREGISTRATION.md.
+  shuffle(seed, gain = 1) {
+    if (gain !== 1) { this.wSyn *= gain; this.wPoisson *= gain; }
+    const rand = mulberry32(seed >>> 0);
+    const post = Uint32Array.from(this.post);
+    const owner = new Uint32Array(this.nsyn);
+    for (let i = 0; i < this.n; i++) for (let e = this.indptr[i]; e < this.indptr[i + 1]; e++) owner[e] = i;
+    for (let e = post.length - 1; e > 0; e--) {
+      const j = Math.floor(rand() * (e + 1)); const t = post[e]; post[e] = post[j]; post[j] = t;
+    }
+    // Self-loops: swap the target with another edge's where neither becomes one.
+    let loops = 0;
+    for (let e = 0; e < post.length; e++) {
+      if (post[e] !== owner[e]) continue;
+      for (let tries = 0; tries < 64; tries++) {
+        const j = Math.floor(rand() * post.length);
+        if (post[j] !== owner[e] && post[e] !== owner[j]) { const t = post[e]; post[e] = post[j]; post[j] = t; break; }
+        if (tries === 63) loops++;
+      }
+    }
+    this.post = post;
+    if (this.ngap) {
+      const b = Uint32Array.from(this.gapB);
+      for (let e = b.length - 1; e > 0; e--) { const j = Math.floor(rand() * (e + 1)); const t = b[e]; b[e] = b[j]; b[j] = t; }
+      for (let e = 0; e < b.length; e++) if (b[e] === this.gapA[e]) { const j = (e + 1) % b.length; const t = b[e]; b[e] = b[j]; b[j] = t; }
+      this.gapB = b;
+    }
+    this.shuffled = { seed: seed >>> 0, gain, unresolvedSelfLoops: loops };
+    return this.shuffled;
   }
 
   wake(i) {
@@ -87,9 +149,8 @@ export class FlyBrain {
 
   // One 0.1 ms step. `rates` is Hz per channel; `counts` collects spikes (or null).
   step(rates, rand, counts) {
-    const { v, g, rfc, noRfc, P, em, es, k } = this;
+    const { v, g, rfc, noRfc, P, em, es, k, pinned } = this;
     const v0 = P.v_0, vth = P.v_th;
-    // groups: integrate every awake, non-refractory neuron; retire the settled
     let live = 0, nSpk = 0;
     const list = this.awakeList, spk = this.spikesStep;
     for (let j = 0; j < this.awakeCount; j++) {
@@ -100,18 +161,26 @@ export class FlyBrain {
       const gn = gi * es;
       v[i] = vi; g[i] = gn;
       if (vi > vth) spk[nSpk++] = i;
-      if (Math.abs(vi - v0) < 1e-5 && Math.abs(gn) < 1e-6) { v[i] = v0; g[i] = 0; this.awake[i] = 0; }
+      if (!pinned[i] && Math.abs(vi - v0) < 1e-5 && Math.abs(gn) < 1e-6) { v[i] = v0; g[i] = 0; this.awake[i] = 0; }
       else list[live++] = i;
     }
     this.awakeCount = live;
-    // thresholds of the Poisson inputs, and synapses: delayed deliveries land on
-    // g, input spikes land on v -- both before the reset below, as in Brian2
-    // A REFRACTORY TARGET IGNORES THE SPIKE. g is declared "(unless refractory)",
-    // and in Brian2 that guards synaptic updates to it as well as its
-    // integration: an input landing inside t_rfc is lost, not stored for later.
-    // Storing it instead let a neuron fire again one input sooner -- an ISI of
-    // 250 steps where Brian2 gives 300 -- which compounded into ~25% more
-    // spikes downstream of a strong stimulus.
+    if (this.gapGain) {
+      // Both ends read before either moves, so a junction's order in the list
+      // does not decide which way current flows first.
+      const A = this.gapA, B = this.gapB, W = this.gapW, c = this.gapGain;
+      for (let e = 0; e < A.length; e++) {
+        const a = A[e], b = B[e];
+        if (rfc[a] > 0 || rfc[b] > 0) continue;
+        const d = c * W[e] * (v[b] - v[a]);
+        v[a] += d; v[b] -= d;
+      }
+      // A junction can carry a neuron over threshold; it spikes this step, as
+      // one pushed there by integration does.
+      for (let e = 0; e < A.length; e++) for (const i of [A[e], B[e]]) {
+        if (rfc[i] === 0 && v[i] > vth && !this.spikeMarked(i, nSpk)) spk[nSpk++] = i;
+      }
+    }
     const bucket = this.ring[this.head];
     for (let s = 0; s < bucket.len; s++) {
       const t = bucket.post[s];
@@ -129,27 +198,23 @@ export class FlyBrain {
         if (rand() < p) { const t = idx[s]; if (rfc[t] > 0) continue; v[t] += this.wPoisson; this.wake(t); }
       }
     }
-    // resets, and each spike queued t_dly ahead
     const target = this.ring[(this.head + this.delaySteps) % this.ring.length];
     for (let s = 0; s < nSpk; s++) {
       const i = spk[s];
       v[i] = P.v_rst; g[i] = 0;
-      // Brian2 frees a neuron once timestep(t - lastspike) >= timestep(t_rfc):
-      // after a spike at step k it is frozen for steps k+1 .. k+21 and
-      // integrates again at k+22. The counter runs down at the end of each
-      // step, including this one, so 22 here freezes exactly those 21.
       rfc[i] = noRfc[i] ? 0 : this.rfcSteps;
       if (counts) counts[i]++;
       for (let e = this.indptr[i], end = this.indptr[i + 1]; e < end; e++) {
         this.push(target, this.post[e], this.count[e] * this.wSyn);
       }
     }
-    // a refractory neuron's clock runs down whether or not it is integrated
     for (let j = 0; j < this.awakeCount; j++) { const i = list[j]; if (rfc[i] > 0) rfc[i]--; }
     this.head = (this.head + 1) % this.ring.length;
   }
 
-  // Spike counts per neuron over one decision window, as brain.run_window.
+  // Linear, but only ever over this step's few spikes and only for coupled species.
+  spikeMarked(i, nSpk) { const spk = this.spikesStep; for (let s = 0; s < nSpk; s++) if (spk[s] === i) return true; return false; }
+
   runWindow(rates, windowMs, seed, flushMs = 2.0) {
     const rand = mulberry32(seed >>> 0);
     const flushSteps = Math.round(flushMs / this.dt);

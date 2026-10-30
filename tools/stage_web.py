@@ -36,7 +36,23 @@ def main():
 
     shutil.rmtree(out, ignore_errors=True)
     too_big, copied, total = [], 0, 0
-    for root, _, files in os.walk(web):
+    for root, dirs, files in os.walk(web):
+        # Local desktop exports include datasets that are intentionally never
+        # published. The public page continues to ship its existing female
+        # FlyWire package through web/data, under its existing CC BY-NC terms.
+        relroot = os.path.relpath(root, web)
+        if relroot == "species":
+            dirs[:] = []
+            continue
+        if relroot.startswith("species"):
+            dirs[:] = []
+            continue
+        # The public deploy does not publish the mouse's unlicensed model
+        # weights, so its 28 MB ONNX WASM backend is not needed there either.
+        # Desktop stages keep this runtime and load it fully offline.
+        if relroot == os.path.join("vendor", "onnxruntime-web"):
+            dirs[:] = []
+            continue
         for name in files:
             src = os.path.join(root, name)
             if name in SKIP_NAMES or src in packed:
@@ -50,6 +66,34 @@ def main():
             shutil.copy2(src, dst)
             copied += 1
             total += size
+    # Keep one route inventory in roster.json: the public FlyWire brain is
+    # generated at web/data by CI, then staged at its catalogued species path.
+    public_brain = os.path.join(web, "data", "brain.json")
+    if os.path.isfile(public_brain):
+        target = os.path.join(out, "species", "drosophila_female")
+        os.makedirs(target, exist_ok=True)
+        # The legacy Open Fly export predates Stage's `senses` and `species`
+        # fields. Add those routing fields to the deployment copy so the same
+        # stage runtime can consume it without changing the source package.
+        with open(public_brain) as f:
+            meta = json.load(f)
+        meta["species"] = "drosophila_female"
+        meta["senses"] = {"sugar": "reward", "bitter": "harm", "water": "reserve", "jon": "threat"}
+        meta.setdefault("window_ms", 200)
+        with open(os.path.join(target, "brain.json"), "w") as f:
+            json.dump(meta, f, separators=(",", ":"))
+            f.write("\n")
+        copied += 1
+        total += os.path.getsize(public_brain)
+        for name in os.listdir(os.path.join(web, "data")):
+            if name == "connectome.pack.json" or name.startswith("connectome.bin.part."):
+                src = os.path.join(web, "data", name)
+                if os.path.isfile(src):
+                    shutil.copy2(src, os.path.join(target, name))
+                    copied += 1
+                    total += os.path.getsize(src)
+        if not os.path.isfile(os.path.join(target, "connectome.pack.json")):
+            sys.exit("web/data has no packed connectome for the public roster route")
     if too_big:
         for src, size in too_big:
             print(f"too big for Pages: {os.path.relpath(src, web)} ({size / 1e6:.1f} MB) -- pack it", file=sys.stderr)

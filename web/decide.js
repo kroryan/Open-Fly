@@ -1,6 +1,10 @@
-// The fly's side of a turn, in the browser: game state -> sensory rates, and
-// descending-neuron spikes -> orders. Ports of open_fly/encode.py,
-// decode.choose and players.turn_seed, unchanged in what they compute.
+// Every animal's side of a turn: game state -> sensory rates, and motor spikes
+// -> orders. Open Fly's decide.js with one change: the four numbers the game
+// becomes (reward, harm, reserve, threat) are computed exactly as Open Fly
+// computes sugar, bitter, water and Johnston's organ, and each species' package
+// says which of ITS sensory channels carries which (brain.json "senses"). So
+// every animal on the stage is told the same thing about its country; only the
+// cells it arrives at differ. choose() is Open Fly's, unchanged.
 
 export const MODULES = ["e", "p", "w", "n"];
 const REFS = { land_pp: 0.5, reserve_turns: 12.0, wars: 3.0 };
@@ -21,21 +25,29 @@ export class Encoder {
     }
     const ratio = gross > 1e-9 ? net / gross : 0;
     const sig = {
-      sugar: Math.max(0, dLand) / REFS.land_pp + Math.max(0, ratio),
-      bitter: Math.max(0, -dLand) / REFS.land_pp + Math.max(0, -ratio) + 0.5 * newWars,
-      water: gross > 1e-9 ? treasury / (REFS.reserve_turns * gross) : 0,
-      jon: wars.length / REFS.wars,
+      reward: Math.max(0, dLand) / REFS.land_pp + Math.max(0, ratio),
+      harm: Math.max(0, -dLand) / REFS.land_pp + Math.max(0, -ratio) + 0.5 * newWars,
+      reserve: gross > 1e-9 ? treasury / (REFS.reserve_turns * gross) : 0,
+      threat: wars.length / REFS.wars,
     };
     this.prev = { share, war: [...wars] };
     return sig;
   }
-  rates(s) {
+  // Hz per game signal, then routed to the species' channels. A signal no
+  // channel carries is simply not felt; a species that cannot sense a threat is
+  // a fact about its mapping and is shown on the page, not papered over.
+  signalRates(s) {
     const out = {};
     for (const [k, v] of Object.entries(this.signals(s))) {
       const r = MAX_HZ * Math.min(1, Math.max(0, v));
       out[k] = r >= FLOOR_HZ ? r : 0;
     }
     return out;
+  }
+  rates(s, senses) {
+    const bySignal = this.signalRates(s), out = {};
+    for (const [channel, signal] of Object.entries(senses)) out[channel] = bySignal[signal] || 0;
+    return { bySignal, rates: out };
   }
 }
 

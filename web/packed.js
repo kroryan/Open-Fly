@@ -16,6 +16,19 @@
 // own DecompressionStream, and the result is checked against the manifest
 // before anything uses it. To the page it is one fetch with one progress bar.
 
+// Is there a manifest at this URL? A plain GET, never HEAD: itch.io serves
+// games from a CDN, and a HEAD probe is the kind of request a CDN may answer
+// differently. And it must PARSE as a manifest -- some hosts answer a missing
+// file with 200 and the site's index.html, which a status check believes.
+export async function hasPacked(manifestUrl) {
+  try {
+    const r = await fetch(manifestUrl, { cache: "no-cache" });
+    if (!r.ok) return false;
+    const m = JSON.parse(await r.text());
+    return Array.isArray(m.parts) && typeof m.size === "number";
+  } catch { return false; }
+}
+
 export async function loadPacked(manifestUrl, onProgress = () => {}) {
   const base = new URL(manifestUrl, self.location.href);
   const res = await fetch(base, { cache: "no-cache" });
@@ -23,22 +36,37 @@ export async function loadPacked(manifestUrl, onProgress = () => {}) {
   const m = await res.json();
   const total = m.compressed || 0;
   let got = 0;
-  const parts = await Promise.all(m.parts.map(async (name) => {
-    const r = await fetch(new URL(name, base));
-    if (!r.ok) throw new Error(`${name}: ${r.status}`);
-    const reader = r.body.getReader();
-    const chunks = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      got += value.length;
-      // Clamped: if a host inflated the stream, got counts decompressed bytes
-      // against a compressed total and the bar would read 194%.
-      onProgress(Math.min(got, total) || got, total);
+  // ONE DROPPED PART USED TO FAIL THE WHOLE BRAIN. A 150 MB brain is eight
+  // parts in flight at once beside everything else the page fetches, and a
+  // single "network error" on any of them faulted that animal's seat. Each part
+  // now gets a few attempts; what a failed attempt had counted comes back off
+  // the progress bar, and the manifest's sha256 below still checks the result.
+  const fetchPart = async (name) => {
+    for (let attempt = 1; ; attempt++) {
+      let counted = 0;
+      try {
+        const r = await fetch(new URL(name, base));
+        if (!r.ok) throw new Error(`${name}: ${r.status}`);
+        const reader = r.body.getReader();
+        const chunks = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          got += value.length; counted += value.length;
+          // Clamped: if a host inflated the stream, got counts decompressed bytes
+          // against a compressed total and the bar would read 194%.
+          onProgress(Math.min(got, total) || got, total);
+        }
+        return new Blob(chunks);
+      } catch (err) {
+        got -= counted;
+        if (attempt >= 4) throw new Error(`${name}: ${err.message || err} (after ${attempt} attempts)`);
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
     }
-    return new Blob(chunks);
-  }));
+  };
+  const parts = await Promise.all(m.parts.map(fetchPart));
   const blob = new Blob(parts);
   const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
   const stillGzip = head[0] === 0x1f && head[1] === 0x8b;

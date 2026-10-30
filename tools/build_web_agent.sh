@@ -16,6 +16,15 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# Some packaged Emscripten distributions ship wasm-opt beside its shared
+# Binaryen library but omit that directory from the dynamic loader path.
+for libdir in "${EM_BINARYEN_ROOT:-}/lib/x86_64-linux-gnu" "${EM_BINARYEN_ROOT:-}/lib"; do
+  if [ -n "${EM_BINARYEN_ROOT:-}" ] && [ -f "$libdir/libbinaryen.so" ]; then
+    export LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    break
+  fi
+done
+
 if [ -n "$REF" ]; then
   git -C "$OD" worktree add --detach "$WORK/od" "$REF" >/dev/null
   SRC="$WORK/od"
@@ -41,10 +50,23 @@ else
   trap 'git -C "$OD" worktree remove --force "$WORK/od" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
 fi
 APPLIED=""
-for p in "$HERE"/patches/opendoctrines-agent-research.patch; do
+# The stage patch adds the multi-seat API and includes the player research fix.
+# Apply it before the narrower patches so their overlap is detected cleanly.
+STAGE_PATCH="$HERE/patches/opendoctrines-agent-stage.patch"
+if [ -f "$STAGE_PATCH" ] && ! grep -q "od_agent_stage_begin" "$SRC/src/web/AgentWeb.cpp"; then
+  if ! git -C "$PATCH_TREE" apply --unidiff-zero --check "$STAGE_PATCH"; then
+    echo "Open Doctrines ref $REF cannot accept the pinned stage patch" >&2
+    exit 1
+  fi
+  git -C "$PATCH_TREE" apply --unidiff-zero "$STAGE_PATCH"
+  APPLIED="+stage"
+  echo "applied opendoctrines-agent-stage.patch"
+fi
+for p in "$HERE"/patches/opendoctrines-agent-*.patch; do
   [ -f "$p" ] || continue
-  if git -C "$PATCH_TREE" apply --check "$p" 2>/dev/null; then
-    git -C "$PATCH_TREE" apply "$p"
+  [ "$(basename "$p")" = "opendoctrines-agent-stage.patch" ] && continue
+  if git -C "$PATCH_TREE" apply --unidiff-zero --check "$p" 2>/dev/null; then
+    git -C "$PATCH_TREE" apply --unidiff-zero "$p"
     APPLIED="$APPLIED+$(basename "$p" .patch | sed 's/^opendoctrines-agent-//')"
     echo "applied $(basename "$p")"
   else
@@ -52,8 +74,13 @@ for p in "$HERE"/patches/opendoctrines-agent-research.patch; do
   fi
 done
 
-emcmake cmake -S "$SRC" -B "$WORK/build" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$WORK/build" --target OpenDoctrinesAgent -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
+JOBS="${BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}"
+CMETA=("-DOD_ENABLE_SHAPING=OFF")
+if [ -n "${RAYLIB_SOURCE_DIR:-}" ]; then
+  CMETA+=("-DFETCHCONTENT_SOURCE_DIR_RAYLIB=$RAYLIB_SOURCE_DIR")
+fi
+emcmake cmake -S "$SRC" -B "$WORK/build" -DCMAKE_BUILD_TYPE=Release "${CMETA[@]}"
+cmake --build "$WORK/build" --target OpenDoctrinesAgent -j"$JOBS"
 
 mkdir -p "$HERE/web/agent"
 cp "$WORK/build/OpenDoctrinesAgent.mjs" "$WORK/build/OpenDoctrinesAgent.wasm" "$WORK/build/OpenDoctrinesAgent.data" "$HERE/web/agent/"

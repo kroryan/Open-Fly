@@ -11,12 +11,17 @@ Completeness_*.csv
 /web/data/connectome.bin
 /web/data/brain.bin
 /web/agent/
+/web/species/
+/.cache/
 .venv/
 # Packed for Pages by tools/pack_web.py, and the deploy folder tools/stage_web.py fills.
 /web/data/*.gz.*
 /web/data/*.part.*
 /web/data/*.pack.json
 /dist/
+/desktop/node_modules/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
 # Written by each release run; history.json keeps what matters from them.
 /release/run.json
 /release/discord.json

@@ -1,20 +1,27 @@
 // Open Doctrines, off the page's thread: the OpenDoctrinesAgent WebAssembly
-// module (built from Open Doctrines' own src/web/AgentWeb.cpp). The page asks
-// for a seat, a position, orders and the end of a turn; this module resolves
-// them with the game's own rules.
+// module (built from Open Doctrines' own src/web/AgentWeb.cpp, with
+// patches/opendoctrines-stage.patch). Open Fly's worker asks for one seat; this
+// one asks for a STAGE -- several seats in one world, one per animal -- and
+// then for each seat's position and orders by index. The world resolves the
+// turn once, after every seat has played.
 import createOpenDoctrinesAgent from "./agent/OpenDoctrinesAgent.mjs";
-import { loadPacked } from "./packed.js";
+import { loadPacked, hasPacked } from "./packed.js";
 
 let od = null, api = null;
 
 // The game's data package comes in parts (see packed.js) and is handed to the
 // module whole: Emscripten asks getPreloadedPackage before it would fetch the
 // .data file itself, so the module never goes looking for the 22 MB original.
-const ready = loadPacked("./agent/OpenDoctrinesAgent.pack.json",
-  (got, total) => self.postMessage({ type: "progress", got, total }))
+// A local build has the .data whole and no manifest; then the module fetches it
+// itself, as Emscripten does by default.
+const packUrl = new URL("./agent/OpenDoctrinesAgent.pack.json", import.meta.url).href;
+const ready = hasPacked(packUrl)
+  .then((packed) => (packed
+    ? loadPacked(packUrl, (got, total) => self.postMessage({ type: "progress", got, total }))
+    : null))
   .then((dataPackage) => createOpenDoctrinesAgent({
     locateFile: (path) => new URL(`./agent/${path}`, import.meta.url).href,
-    getPreloadedPackage: () => dataPackage,
+    ...(dataPackage ? { getPreloadedPackage: () => dataPackage } : {}),
     print: (line) => self.postMessage({ type: "log", line }),
     printErr: (line) => self.postMessage({ type: "log", line }),
   }))
@@ -26,6 +33,9 @@ const ready = loadPacked("./agent/OpenDoctrinesAgent.pack.json",
       play: m.cwrap("od_agent_play", "string", ["string"]),
       endTurn: m.cwrap("od_agent_end_turn", "number", []),
       mapSeed: m.cwrap("od_agent_map_seed", "number", []),
+      stageBegin: m.cwrap("od_agent_stage_begin", "number", ["string", "string", "number", "number"]),
+      seatPosition: m.cwrap("od_agent_seat_position", "string", ["number", "number"]),
+      seatPlay: m.cwrap("od_agent_seat_play", "string", ["number", "string"]),
     };
     try { m.FS.mkdir("/maps"); } catch (_) { /* already there */ }
     self.postMessage({ type: "ready" });
@@ -67,6 +77,14 @@ self.onmessage = async (e) => {
         reply = { ok, mapSeed: ok ? api.mapSeed() >>> 0 : 0, ms: performance.now() - t0 };
         break;
       }
+      case "stage": {
+        const t0 = performance.now();
+        const seats = api.stageBegin(msg.map, msg.isos.join(","), msg.seed >>> 0, msg.turns | 0);
+        reply = { seats, mapSeed: seats ? api.mapSeed() >>> 0 : 0, ms: performance.now() - t0 };
+        break;
+      }
+      case "seatPosition": reply = { position: JSON.parse(api.seatPosition(msg.seat | 0, msg.withMap ? 1 : 0)) }; break;
+      case "seatPlay": reply = { moves: JSON.parse(api.seatPlay(msg.seat | 0, msg.tokens)) }; break;
       case "position": reply = { position: JSON.parse(api.position(msg.withMap ? 1 : 0)) }; break;
       case "play": reply = { moves: JSON.parse(api.play(msg.tokens)) }; break;
       case "endTurn": {

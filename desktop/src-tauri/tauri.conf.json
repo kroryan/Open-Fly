@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Open Fly",
+  "mainBinaryName": "open-fly",
+  "version": "1.3.0",
+  "identifier": "org.openfly.desktop",
+  "build": {
+    "beforeDevCommand": "node ../tools/stage_desktop.mjs",
+    "beforeBuildCommand": "node ../tools/stage_desktop.mjs",
+    "frontendDist": "../../dist/desktop-web"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Open Fly",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis"],
+    "category": "Simulation Game",
+    "shortDescription": "Connectome-based animals play Open Doctrines",
+    "longDescription": "Open Fly runs connectome-based animal brains in a 3D stage and lets them play Open Doctrines.",
+    "homepage": "https://open-fly.pages.dev/",
+    "publisher": "Open Fly contributors",
+    "licenseFile": "../../NOTICE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0"]
+      }
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Spanish"]
+      }
+    }
+  }
+}

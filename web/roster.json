@@ -1,0 +1,198 @@
+{
+  "_comment": [
+    "Central local resource catalogue for the web and desktop bundles.",
+    "A package is available in a build only when its required files are present and verified.",
+    "The mouse uses a declared synthetic visual-to-action convention; MICrONS has no motor cortex."
+  ],
+  "checked": "2026-09-21",
+  "species": [
+    {
+      "id": "drosophila_female",
+      "name": "Fruit fly",
+      "detail": "adult female",
+      "dataset": "FlyWire / FAFB",
+      "neurons": 138639,
+      "seat": true,
+      "station": true,
+      "model": "shiu2024-lif",
+      "status": "working",
+      "via": "open-fly",
+      "redistribute": true,
+      "redistribute_why": "FlyWire is CC BY-NC 4.0: redistributable with attribution, NON-COMMERCIAL only. This is what Open Fly's public page already does.",
+      "resources": {
+        "metadata": "species/drosophila_female/brain.json",
+        "connectome": "species/drosophila_female/connectome.pack.json",
+        "positions": "species/drosophila_female/positions.bin",
+        "model": "models/drosophila_female.glb"
+      }
+    },
+    {
+      "id": "drosophila_male",
+      "name": "Fruit fly",
+      "detail": "adult male",
+      "dataset": "MaleCNS v1.0",
+      "neurons": 166700,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "playing",
+      "cell_types": 11691,
+      "coverage": "brain, optic lobes, neck connective and ventral nerve cord",
+      "released": "2026-06-08",
+      "licence": "CC-BY 4.0",
+      "neurotransmitters": "predicted",
+      "access": {
+        "neuprint": "https://male-cns.janelia.org/",
+        "r_package": "https://natverse.org/malecns/"
+      },
+      "note": "the sign problem is already solved here, and the licence is the most permissive on the roster",
+      "redistribute": true,
+      "redistribute_why": "MaleCNS v1.0 is CC-BY 4.0: redistributable with attribution",
+      "resources": {
+        "metadata": "species/drosophila_male/brain.json",
+        "connectome": "species/drosophila_male/connectome.pack.json",
+        "model": "models/drosophila_male.glb"
+      }
+    },
+    {
+      "id": "drosophila_larva",
+      "name": "Fruit fly",
+      "detail": "larva",
+      "dataset": "Winding et al. (2023)",
+      "neurons": 2952,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "candidate",
+      "redistribute": false,
+      "redistribute_why": "Winding et al. 2023 supplementary data states no licence",
+      "warning": "its senses are wired on OUR convention, not the source's: the larva's sensory neurons are assumed cholinergic because only 243 of 2,952 neurons have a published transmitter. 88% of its connections are still dropped as unsigned.",
+      "resources": {
+        "metadata": "species/drosophila_larva/brain.json",
+        "connectome": "species/drosophila_larva/connectome.pack.json",
+        "model": "models/drosophila_larva.glb"
+      },
+      "local_only": true
+    },
+    {
+      "id": "c_elegans_herm",
+      "name": "Roundworm",
+      "detail": "hermaphrodite",
+      "dataset": "Cook et al. (2019)",
+      "neurons": 302,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "playing",
+      "note": "gap junctions are not chemical synapses; a LIF core that treats them alike is wrong invisibly",
+      "redistribute": false,
+      "redistribute_why": "Cook et al. 2019 / WormWiring state no open licence (Copyright Emmons Lab)",
+      "resources": {
+        "metadata": "species/c_elegans_herm/brain.json",
+        "connectome": "species/c_elegans_herm/connectome.pack.json",
+        "model": "models/c_elegans_herm.glb"
+      },
+      "local_only": true
+    },
+    {
+      "id": "c_elegans_male",
+      "name": "Roundworm",
+      "detail": "male",
+      "dataset": "Cook et al. (2019)",
+      "neurons": 385,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "playing",
+      "redistribute": false,
+      "redistribute_why": "Cook et al. 2019 / WormWiring state no open licence (Copyright Emmons Lab)",
+      "resources": {
+        "metadata": "species/c_elegans_male/brain.json",
+        "connectome": "species/c_elegans_male/connectome.pack.json",
+        "model": "models/c_elegans_male.glb"
+      },
+      "local_only": true
+    },
+    {
+      "id": "ciona_larva",
+      "name": "Sea squirt",
+      "detail": "larva",
+      "dataset": "Ryan et al. (2016)",
+      "neurons": 207,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "playing",
+      "synapses": 6618,
+      "gap_junctions": 1206,
+      "note": "1,206 gap junctions against 6,618 chemical synapses: a fifth of the wiring is electrical, and a LIF core that ignores that is wrong silently",
+      "published": "eLife 2016, 10.7554/eLife.16962",
+      "redistribute": true,
+      "redistribute_why": "eLife 16962 source data is CC-BY 4.0: redistributable with attribution",
+      "resources": {
+        "metadata": "species/ciona_larva/brain.json",
+        "connectome": "species/ciona_larva/connectome.pack.json",
+        "model": "models/ciona_larva.glb"
+      }
+    },
+    {
+      "id": "zebrafish_larva",
+      "name": "Zebrafish",
+      "detail": "larva, 7 days post-fertilisation",
+      "dataset": "Fish1",
+      "neurons": 178976,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "candidate",
+      "access": {
+        "client": "caveclient",
+        "datastack": "fish1_full",
+        "dataset": "fish1_v250915",
+        "server": "https://global.brain-wire-test.org/",
+        "token": "personal, by hand, never committed",
+        "materialization": 704
+      },
+      "note": "vglut2a and gad1b labels give each cell a sign, which is what makes a LIF model possible at all",
+      "redistribute": true,
+      "redistribute_why": "Fish1 data policy (read 2026-09-21, fish1-release.storage.googleapis.com/data_policy.html): an 'Open Access Policy' whose condition is that any work using it cites Petkova et al. 2025; it names no licence and says nothing about derived data, and is shipped on the owner's decision, with that citation",
+      "wiring": "proofread-v704",
+      "sensory_convention": "brain-nuclei-v1",
+      "warning": "This fish senses through four brain nuclei chosen by our convention, because its peripheral sense organs are missing from the traced data.",
+      "resources": {
+        "metadata": "species/zebrafish_larva/brain.json",
+        "connectome": "species/zebrafish_larva/connectome.pack.json",
+        "model": "models/zebrafish_larva.glb"
+      }
+    },
+    {
+      "id": "mouse_v1",
+      "name": "Mouse",
+      "detail": "visual cortex",
+      "dataset": "MICrONS cubic millimetre",
+      "neurons": 120000,
+      "cells": 200000,
+      "synapses": 523000000,
+      "seat": true,
+      "station": true,
+      "model": null,
+      "status": "playable · synthetic readout",
+      "why_no_seat": null,
+      "functional": "~75,000 pyramidal neurons with recorded responses to visual stimuli",
+      "redistribute": false,
+      "redistribute_why": "MICrONS source data is CC BY 4.0, but the released digital-twin model weights state no licence; included only in the owner’s local build.",
+      "resources": {
+        "metadata": "species/mouse_v1/mouse.json",
+        "model": "models/mouse_v1.glb",
+        "modelWeights": "species/mouse_v1/model.pack.json"
+      },
+      "note": "MICrONS is visual cortex only. The game maps visual-model activity to actions by a deterministic synthetic readout; this is not biological motor output.",
+      "local_only": true
+    }
+  ],
+  "source": {
+    "repository": "https://github.com/Pr1nted/Open-Animal-Stage",
+    "commit": "4cb2c8610c801febf355279e58a920897ce99e3e",
+    "models": "Open Animal Stage, Apache-2.0, source commit 4cb2c8610c801febf355279e58a920897ce99e3e"
+  }
+}
