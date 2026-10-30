@@ -116,6 +116,25 @@
   .loading strong { font: 800 34px/1 var(--display); text-transform: uppercase; }
   .loading p { color: var(--muted); }
   .loading .err { color: #FBD9D3; }
+  .brain-consent { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; background: rgba(4, 8, 9, .88); }
+  .brain-consent[hidden] { display: none; }
+  .brain-consent section { width: min(760px, 100%); max-height: min(820px, calc(100vh - 40px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 14px; padding: 22px; border: 1px solid rgba(210, 220, 222, .18); border-radius: 18px; background: #11191b; box-shadow: 0 28px 100px #000a; }
+  .brain-consent h2 { margin: 0 0 6px; font: 800 30px/1 var(--display); text-transform: uppercase; }
+  .brain-consent header p, .brain-consent footer p { margin: 0; color: var(--muted); font-size: 12px; }
+  .brain-consent .terms { min-height: 120px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .brain-consent .term { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .brain-consent .term:last-child { border-bottom: 0; }
+  .brain-consent .term-head { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+  .brain-consent .term b { font-size: 13px; }
+  .brain-consent .term small { color: var(--muted); font: 10px/1.3 var(--mono); text-transform: uppercase; }
+  .brain-consent .term p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+  .brain-consent .term a { display: inline-block; margin-top: 6px; color: var(--teal); font-size: 11px; }
+  .brain-consent footer { display: grid; gap: 10px; }
+  .brain-consent .consent-check { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; }
+  .brain-consent .consent-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .brain-consent button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--line); border-radius: 9px; background: #202a2d; color: var(--paper); cursor: pointer; }
+  .brain-consent button.primary { background: var(--teal); border-color: transparent; color: #071112; font-weight: 700; }
+  .brain-consent button:disabled { opacity: .45; cursor: not-allowed; }
 
   @media (max-width: 900px) {
     .ident h1 { font-size: 32px; } .ident p { display: none; }
@@ -189,6 +208,20 @@
   <button type="button" id="povExit">Leave the mouse's view</button>
 </aside>
 <div class="loading" id="loading"><div><strong>Opening the room</strong><p id="loadText">Loading&hellip;</p></div></div>
+<div class="brain-consent" id="brainConsent" hidden>
+  <section role="dialog" aria-modal="true" aria-labelledby="brainConsentTitle">
+    <header>
+      <h2 id="brainConsentTitle">Brain data terms</h2>
+      <p id="brainConsentIntro">This public build includes only datasets whose catalogued terms allow public redistribution. Review the source and attribution for each included brain. Excluded datasets are not included.</p>
+    </header>
+    <div class="terms" id="brainTerms"></div>
+    <footer>
+      <label class="consent-check"><input type="checkbox" id="brainConsentCheck"> I have read and accept the stated conditions for the included brain data.</label>
+      <p id="brainConsentNote">Your choice is saved on this device for this terms revision. Acceptance does not replace or expand the source licences.</p>
+      <div class="consent-actions"><button type="button" id="brainConsentCancel">Cancel startup</button><button type="button" class="primary" id="brainConsentAccept" disabled>Accept and continue</button></div>
+    </footer>
+  </section>
+</div>
 
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
@@ -196,6 +229,7 @@
 <script src="./vendor/fflate.js"></script>
 <script type="module">
 import { Encoder, choose, turnSeed, BRAIN_SEED, WINDOW_MS } from "./decide.js";
+import { installBrainCache, cachedBrainAsset, discardCachedBrainAsset } from "./brain-cache.js";
 
 const $ = (id) => document.getElementById(id);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -246,16 +280,26 @@ function brainFor(species, shuffled, onProgress, instance = "shared") {
   const key = `${species.id}|${shuffled ? "shuffled" : "real"}${species.id === "mouse_v1" ? `|${instance}` : ""}`;
   if (brains.has(key)) return brains.get(key);
   if (species.id === "mouse_v1") {
-    const w = rpcWorker("./mouse-worker.js", true);
-    const loaded = new Promise((res, rej) => w.on((m) => {
-      if (m.type === "loaded") {
-        const meta = { ...m.meta, species: "mouse_v1", sensory: {}, senses: {}, motor: Array.from({ length: m.meta.n }, (_, i) => i), groups: visualActionGroups(m.meta.n),
-          provenance: { readout: "CONVENTION (not a source annotation): visual-cortex response cells are assigned deterministically to the 39 game actions; MICrONS contains no motor cortex." } };
-        res({ ...m, meta });
-      }
-      if (m.type === "error") rej(new Error(m.message));
-    }));
-    w.post({ type: "load", base: "./species/mouse_v1/" });
+    const w = rpcWorker("./mouse-worker.js");
+    let rejectLoad, phase = "starting local ONNX runtime";
+    const loaded = new Promise((res, rej) => {
+      rejectLoad = rej;
+      w.on((m) => {
+        if (m.type === "progress") { phase = m.message; if (onProgress) onProgress(phase); }
+        if (m.type === "loaded") {
+          clearTimeout(loadTimeout);
+          const meta = { ...m.meta, species: "mouse_v1", sensory: {}, senses: {}, motor: Array.from({ length: m.meta.n }, (_, i) => i), groups: visualActionGroups(m.meta.n),
+          provenance: { readout: "CONVENTION (not a source annotation): this MICrONS model covers visual cortex only; Open Fly maps its visual responses to 39 game actions through a synthetic readout, not biological motor output." } };
+          res({ ...m, meta });
+        }
+        if (m.type === "error") { clearTimeout(loadTimeout); rej(new Error(m.message)); }
+      });
+    });
+    const loadTimeout = setTimeout(() => {
+      w.kill();
+      rejectLoad(new Error(`model startup timed out while ${phase}`));
+    }, 120000);
+    w.post({ type: "load", base: brainBase(species), root: brainRoot, cacheVersion: delivery.cacheVersion });
     const entry = { w, loaded, key };
     brains.set(key, entry); loaded.catch(() => brains.delete(key));
     return entry;
@@ -266,7 +310,7 @@ function brainFor(species, shuffled, onProgress, instance = "shared") {
     if (m.type === "loaded") res(m);
     if (m.type === "error") rej(new Error(m.message));
   }));
-  w.post({ type: "load", base: `./species/${species.id}/`, shuffleSeed: shuffled ? SHUFFLE_SEED : null });
+  w.post({ type: "load", base: brainBase(species), root: brainRoot, cacheVersion: delivery.cacheVersion, shuffleSeed: shuffled ? SHUFFLE_SEED : null });
   const entry = { w, loaded, key };
   brains.set(key, entry);
   loaded.catch(() => brains.delete(key));
@@ -289,19 +333,104 @@ function visualActionGroups(n) {
 // data/roster.json is the one list; a species can take a seat when its row says
 // so AND its package is actually here. The page never offers what it cannot run.
 let roster = [];
+let delivery = { profile: "private" }, brainRoot = null;
 const available = new Map();   // id -> brain.json of a package that exists
 const label = (s) => `${s.name} · ${s.detail}`;
 const shortLabel = (s) => ({ drosophila_female: "Fly ♀", drosophila_male: "Fly ♂", drosophila_larva: "Fly larva", c_elegans_herm: "Worm ⚥", c_elegans_male: "Worm ♂", ciona_larva: "Sea squirt", zebrafish_larva: "Zebrafish", mouse_v1: "Mouse" }[s.id] || s.name);
-async function readRoster() {
-  roster = (await (await fetch("./roster.json")).json()).species;
-  await Promise.all(roster.map(async (s) => {
-    try {
-      const r = await fetch(`./species/${s.id}/brain.json`, { cache: "no-cache" });
-      if (r.ok && (r.headers.get("content-type") || "").includes("json")) available.set(s.id, await r.json());
-      else if (s.id === "mouse_v1") {
-        const m = await fetch(`./species/${s.id}/mouse.json`, { cache: "no-cache" });
-        if (m.ok && (m.headers.get("content-type") || "").includes("json")) available.set(s.id, await m.json());
+const brainBase = (s) => brainRoot ? new URL(`species/${s.id}/`, brainRoot).href : `./species/${s.id}/`;
+const brainAsset = (s, name) => brainRoot ? new URL(name, brainBase(s)).href : `${brainBase(s)}${name}`;
+const brainResource = (s, key) => brainRoot ? new URL(s.resources[key], brainRoot).href : `./${s.resources[key]}`;
+
+function requestPublicBrainConsent() {
+  const key = `open-fly-brain-terms:${delivery.termsVersion || delivery.cacheVersion || "current"}`;
+  try { if (localStorage.getItem(key) === "accepted") return Promise.resolve(true); } catch { /* ask again if storage is unavailable */ }
+  const remote = Boolean(delivery.brainRoot);
+  $("brainConsentTitle").textContent = remote ? "Brain data download" : "Brain data terms";
+  $("brainConsentIntro").textContent = remote
+    ? "This public build downloads only datasets whose catalogued terms allow public redistribution. Review the source and attribution for each included brain. Excluded datasets are not downloaded."
+    : "This public build includes only datasets whose catalogued terms allow public redistribution. Review the source and attribution for each included brain. Excluded datasets are not included.";
+  $("brainConsentNote").textContent = remote
+    ? "Your choice is saved on this device for this terms revision. Acceptance does not replace or expand the source licences."
+    : "Your choice is saved on this device for this terms revision. Included brain files are loaded only after acceptance.";
+  $("brainConsentAccept").textContent = remote ? "Accept and download" : "Accept and continue";
+  $("brainTerms").innerHTML = roster.map((s) => {
+    const included = s.public_redistribute === true;
+    const status = included ? (remote ? "Included · download after consent" : "Included · bundled in this build")
+      : `${remote ? "Not downloaded" : "Not included"} · rights not established for unrestricted redistribution`;
+    const conditions = included ? (s.public_why || s.licence || s.license || "See source terms and retain attribution.")
+      : (s.public_why || s.redistribute_why || "No public redistribution terms recorded.");
+    const link = s.terms_url ? `<a href="${esc(s.terms_url)}" target="_blank" rel="noopener">Review source terms</a>` : "";
+    return `<article class="term"><div class="term-head"><b>${esc(s.name)} · ${esc(s.detail)}</b><small>${esc(status)}</small></div><p><b>Dataset:</b> ${esc(s.dataset || "source not recorded")}</p><p>${esc(conditions)}</p>${link}</article>`;
+  }).join("");
+  const modal = $("brainConsent"), checkbox = $("brainConsentCheck"), accept = $("brainConsentAccept"), cancel = $("brainConsentCancel");
+  modal.hidden = false; checkbox.checked = false; accept.disabled = true;
+  return new Promise((resolve) => {
+    const clean = (answer) => {
+      modal.hidden = true;
+      checkbox.removeEventListener("change", changed);
+      accept.removeEventListener("click", accepted);
+      cancel.removeEventListener("click", declined);
+      if (answer) try { localStorage.setItem(key, "accepted"); } catch { /* the consent remains valid for this launch */ }
+      resolve(answer);
+    };
+    const changed = () => { accept.disabled = !checkbox.checked; };
+    const accepted = () => clean(checkbox.checked);
+    const declined = () => clean(false);
+    checkbox.addEventListener("change", changed);
+    accept.addEventListener("click", accepted);
+    cancel.addEventListener("click", declined);
+  });
+}
+
+async function downloadPublicBrains(loadText) {
+  await installBrainCache(brainRoot, delivery.cacheVersion);
+  const inventoryResponse = await fetch("./brain-inventory.json", { cache: "no-cache" });
+  if (!inventoryResponse.ok) throw new Error(`brain download inventory answered ${inventoryResponse.status}`);
+  const inventory = await inventoryResponse.json();
+  if (!Array.isArray(inventory.files) || !inventory.files.length) throw new Error("brain download inventory is empty");
+  let next = 0, checked = 0;
+  const work = async () => {
+    for (;;) {
+      const index = next++;
+      if (index >= inventory.files.length) return;
+      const file = inventory.files[index], url = new URL(file.path, brainRoot).href;
+      const verify = async (response) => {
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength !== file.size) throw new Error(`${file.path}: expected ${file.size} bytes, received ${bytes.byteLength}`);
+        const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+        if (hash !== file.sha256) throw new Error(`${file.path}: checksum mismatch`);
+      };
+      const cached = await cachedBrainAsset(url);
+      let valid = false;
+      if (cached) {
+        try { await verify(cached); valid = true; } catch { await discardCachedBrainAsset(url); }
       }
+      if (!valid) {
+        loadText.textContent = `Downloading brain data ${checked + 1}/${inventory.files.length}: ${file.path.split("/").at(-1)}`;
+        const response = await fetch(url, { cache: "no-cache" });
+        if (!response.ok) throw new Error(`${file.path}: download answered ${response.status}`);
+        try { await verify(response.clone()); } catch (error) { await discardCachedBrainAsset(url); throw error; }
+      }
+      checked++;
+      loadText.textContent = `Checking brain data ${checked}/${inventory.files.length}…`;
+    }
+  };
+  await Promise.all(Array.from({ length: 3 }, work));
+}
+
+async function readRoster() {
+  const doc = await (await fetch("./roster.json")).json();
+  roster = doc.species; delivery = doc.delivery || delivery;
+  if (delivery.profile === "public") {
+    brainRoot = delivery.brainRoot ? new URL(delivery.brainRoot, location.href).href : null;
+    if (!await requestPublicBrainConsent()) throw new Error("Brain data terms were not accepted; startup cancelled.");
+    if (brainRoot) await downloadPublicBrains($("loadText"));
+  }
+  await Promise.all(roster.map(async (s) => {
+    if (s.public_disabled) return;
+    try {
+      const r = await fetch(brainResource(s, "metadata"), { cache: "no-cache" });
+      if (r.ok && (r.headers.get("content-type") || "").includes("json")) available.set(s.id, await r.json());
     } catch (_) { /* not packaged here */ }
   }));
   $("roster").innerHTML = roster.map((s) => {
@@ -311,8 +440,9 @@ async function readRoster() {
     // redistributed, so it has to be exported locally (tools/export_*.py).
     // Not here, and not cleared to be served: that is the reason a visitor to
     // the published page needs, not how to export it.
-    const held = !available.has(s.id) && s.redistribute !== true;
-    const why = held ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
+    const held = s.public_disabled || (!available.has(s.id) && s.redistribute !== true);
+    const why = s.public_disabled ? `not included in this public build: ${s.public_why || "redistribution terms are not confirmed"}`
+      : held ? `not served here: ${s.redistribute_why}. Export it locally to play it.`
       : s.id === "mouse_v1" ? (available.has(s.id) ? "plays through a synthetic readout of visual-cortex activity; this dataset has no motor cortex" : "visual cortex model not packaged")
       : s.blocker && available.has(s.id) ? (isWatcher(s) ? `watches from its tank; cannot act. ${s.blocker}` : s.blocker)
       : ok ? `${fmt.format(available.get(s.id).n)} neurons`
@@ -1101,13 +1231,30 @@ const MOUSE_COLOR = "#C9C3B6";
 let mouseWorker = null, mouseLoaded = null;
 function buildMouse(n, total) {
   const species = roster.find((s) => s.id === "mouse_v1");
-  const m = { species, color: MOUSE_COLOR, title: "Mouse · visual cortex", subtitle: "watches the world; does not play", busy: false, looks: 0, state: "load" };
+  const m = { species, color: MOUSE_COLOR, title: "Mouse · visual cortex", subtitle: "watches the world; does not play", busy: false, looks: 0, state: "load", stateLine: "starting the local model…" };
   m.st = buildStation(m, n, total); stations.push(m.st);
   m.frame = document.createElement("canvas"); m.frame.width = 256; m.frame.height = 144;
   if (!mouseWorker) {
-    mouseWorker = rpcWorker("./mouse-worker.js", true);
-    mouseLoaded = new Promise((res, rej) => mouseWorker.on((msg) => { if (msg.type === "loaded") res(msg); if (msg.type === "error") rej(new Error(msg.message)); }));
-    mouseWorker.post({ type: "load", base: "./species/mouse_v1/" });
+    mouseWorker = rpcWorker("./mouse-worker.js");
+    let rejectLoad;
+    mouseLoaded = new Promise((res, rej) => { rejectLoad = rej; mouseWorker.on((msg) => {
+      if (msg.type === "progress" && G.mouse) { G.mouse.stateLine = msg.message; drawMouseMonitor(G.mouse); }
+      if (msg.type === "loaded") res(msg);
+      if (msg.type === "error") rej(new Error(msg.message));
+    }); });
+    const loadTimeout = setTimeout(() => {
+      if (G.mouse && G.mouse.state === "load") {
+        mouseWorker.kill();
+        // A broken WebKit WASM initialisation used to leave an endless
+        // "Loading" screen. Surface the phase and stop the stuck worker.
+        rejectLoad(new Error(`model startup timed out (${G.mouse.stateLine || "unknown phase"})`));
+        G.mouse.state = "fault";
+        G.mouse.stateLine = `model startup timed out while ${G.mouse.stateLine || "loading"}`;
+        drawMouseMonitor(G.mouse); showBoard();
+      }
+    }, 120000);
+    mouseWorker.post({ type: "load", base: brainBase(species), root: brainRoot, cacheVersion: delivery.cacheVersion });
+    mouseLoaded.finally(() => clearTimeout(loadTimeout)).catch(() => {});
   }
   mouseLoaded.then(({ meta, ep }) => {
     m.meta = meta; m.ep = ep; m.state = "ready";
@@ -1231,7 +1378,7 @@ function drawMouseMonitor(m) {
   c.imageSmoothingEnabled = false; c.drawImage(m.frame, 0, 48, 1280, 720);
   c.fillStyle = "rgba(8,10,14,.78)"; c.fillRect(0, H - 64, W, 64);
   c.fillStyle = "#E6E8EE"; c.font = "500 19px Figtree, sans-serif";
-  const line = m.state === "fault" ? `the cortex model could not run: ${m.stateLine}` : m.state === "load" ? "loading the cortex model (35 MB)…"
+  const line = m.state === "fault" ? `the cortex model could not run: ${m.stateLine}` : m.state === "load" ? (m.stateLine || "loading the cortex model (35 MB)…")
     : m.busy ? "looking…" : m.looks ? `${fmt.format(m.above)} of ${fmt.format(m.meta.n)} recorded neurons predicted above their usual level` : "waiting for the first map";
   c.fillText(line, 18, H - 50);
   c.fillStyle = "#8C92A0"; c.font = "500 15px Figtree, sans-serif"; c.fillText("predictions of a model fitted to this mouse's recordings (MICrONS digital twin), not recordings and not a player", 18, H - 24);
@@ -1482,7 +1629,7 @@ async function newStage(choice) {
   // to load faults its seat; it does not take the stage with it.
   await Promise.all(seats.map(async (s) => {
     try {
-      const b = brainFor(s.species, s.shuffled, (f) => { s.stateLine = `downloading ${Math.round(f * 100)}%`; showBoard(); }, s.i);
+      const b = brainFor(s.species, s.shuffled, (f) => { s.stateLine = typeof f === "string" ? f : `downloading ${Math.round(f * 100)}%`; showBoard(); }, s.i);
       const m = await b.loaded;
       s.brain = b; s.meta = m.meta;
       s.motor = Int32Array.from(motorOf(m.meta));
@@ -1498,7 +1645,7 @@ async function newStage(choice) {
         || (prov.convention ? `a stated convention (${prov.convention}); see ${prov.convention_doc || "the package's provenance"}` : null);
       let posBuf = null;
       // Where the source put each neuron, when it says; the shuffle moves wires, not cells.
-      try { const r = await fetch(`./species/${s.species.id}/positions.bin`); if (r.ok && (r.headers.get("content-type") || "").includes("octet")) posBuf = await r.arrayBuffer(); } catch (_) { /* layout by role */ }
+      try { const r = await fetch(brainAsset(s.species, "positions.bin")); if (r.ok && (r.headers.get("content-type") || "").includes("octet")) posBuf = await r.arrayBuffer(); } catch (_) { /* layout by role */ }
       attachBrain(s.st, m.meta, s.species.id === "mouse_v1" ? mouseBrainPoints(m.meta) : brainPoints(m.meta, posBuf), s.color);
       s.state = "ready";
     } catch (e) { s.state = "fault"; s.fault = String(e.message || e); s.stateLine = s.fault.slice(0, 60); s.meta = s.meta || { n: 0 }; }

@@ -3,17 +3,26 @@
 // tools/export_microns_twin.py. See docs/mouse.md for what this does and does
 // not claim. In one line: these are PREDICTIONS of what 8,221 recorded neurons
 // of mouse 17797 would do if shown the map, from a model fitted to their
-// recordings -- not a simulation of the wiring, and not a player.
+// recordings -- not a simulation of the wiring. When selected as a game
+// player, Open Fly maps visual responses to orders through its labelled,
+// synthetic action readout.
 //
 // The mouse keeps looking: its recurrent state carries from one look to the
 // next, so a new map is seen after the old one, as a real screen would be.
 // Behaviour inputs are fnn's own default, 0 (average pupil, average running):
 // there is no mouse here, so there is no behaviour to report.
-const ORT = new URL("./vendor/onnxruntime-web/", self.location.href).href;
-importScripts(ORT + "ort.webgpu.min.js");
-// In a worker there is no <script> tag for the runtime to find its .wasm
-// files beside, so it is told where they are.
-ort.env.wasm.wasmPaths = ORT;
+import * as ort from "./vendor/onnxruntime-web/ort.webgpu.min.mjs";
+import { installBrainCache } from "./brain-cache.js";
+
+const ORT = new URL("./vendor/onnxruntime-web/", self.location.href);
+// Pin a WebKit-compatible ONNX Runtime build explicitly. Tauri's Linux
+// WebKit does not consistently initialise the default threaded WASM glue;
+// the official Asyncify build works without cross-origin isolation and is
+// bundled beside this worker, so startup never depends on a CDN.
+ort.env.wasm.wasmPaths = {
+  mjs: new URL("ort-wasm-simd-threaded.asyncify.mjs", ORT).href,
+  wasm: new URL("ort-wasm-simd-threaded.asyncify.wasm", ORT).href,
+};
 // The local page and Tauri webviews don't promise cross-origin isolation. Keep
 // ONNX Runtime on its portable single-threaded WASM path instead of letting a
 // speculative WebGPU session initialise a threaded fallback first.
@@ -55,14 +64,19 @@ self.onmessage = async (e) => {
   const msg = e.data;
   try {
     if (msg.type === "load") {
+      if (msg.root) await installBrainCache(msg.root, msg.cacheVersion);
+      self.postMessage({ type: "progress", message: "reading the mouse model metadata" });
       meta = await (await fetch(new URL("mouse.json", new URL(msg.base, self.location.href)))).json();
+      self.postMessage({ type: "progress", message: "loading 35 MB of local model data" });
       const buf = await loadModel(new URL(msg.base, self.location.href));
+      self.postMessage({ type: "progress", message: "initialising the visual cortex on CPU" });
       const tried = [];
       for (const want of ["wasm", "webgpu"]) {
         try { sess = await ort.InferenceSession.create(buf, { executionProviders: [want] }); ep = want; break; }
         catch (err) { tried.push(`${want}: ${err && err.message || err}`); if (want === "wasm") throw new Error(tried.join("; ")); }
       }
       state = meta.state.map((s) => new ort.Tensor("float32", new Float32Array(s.shape.reduce((a, b) => a * b, 1)), s.shape));
+      self.postMessage({ type: "progress", message: "visual cortex ready" });
       self.postMessage({ type: "loaded", meta, ep });
     } else if (msg.type === "look") {
       // `frames` frames of one still image; the first look also runs the
